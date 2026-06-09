@@ -2,6 +2,8 @@ package payment
 
 import "fmt"
 
+var errInvalidBaseURL = fmt.Errorf("payment: base url must include scheme and host")
+
 // APIError is returned for non-2xx gateway responses.
 type APIError struct {
 	StatusCode int

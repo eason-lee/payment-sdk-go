@@ -10,21 +10,24 @@ import (
 )
 
 func main() {
-	secret := os.Getenv("PAYMENT_SECRET")
+	merchant := payment.Merchant{
+		ID:     os.Getenv("PAYMENT_MERCHANT_ID"),
+		Secret: os.Getenv("PAYMENT_SECRET"),
+	}
 	http.HandleFunc("/payment/notify", func(w http.ResponseWriter, r *http.Request) {
-		notifyHandler(w, r, secret)
+		notifyHandler(w, r, merchant)
 	})
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func notifyHandler(w http.ResponseWriter, r *http.Request, secret string) {
+func notifyHandler(w http.ResponseWriter, r *http.Request, merchant payment.Merchant) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "read body failed", http.StatusBadRequest)
 		return
 	}
 
-	if !payment.VerifyNotifyHTTP(secret, r.Header, body) {
+	if !payment.VerifyNotifyHTTP(merchant, r.Header, body) {
 		http.Error(w, "invalid signature", http.StatusUnauthorized)
 		return
 	}

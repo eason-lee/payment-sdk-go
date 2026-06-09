@@ -11,19 +11,26 @@ go get github.com/bigword/payment-sdk-go
 ## Create Client
 
 ```go
-client := payment.NewClient(payment.Config{
-	BaseURL:    "https://api.example.com",
-	MerchantID: "1001",
-	Secret:    "merchant-secret",
-})
+client := payment.NewClient(payment.Production())
+merchant := payment.Merchant{
+	ID:     "1001",
+	Secret: "merchant-secret",
+}
 ```
 
-`Secret` must stay on merchant server. Never expose it in browser, mobile app, or client-side bundle.
+`Production()` and `Sandbox()` currently point to `http://192.168.1.171`.
+When sandbox domain becomes separate, switch client init only:
+
+```go
+client := payment.NewClient(payment.Sandbox())
+```
+
+`Merchant.Secret` must stay on merchant server. Never expose it in browser, mobile app, or client-side bundle.
 
 ## Create Payin
 
 ```go
-resp, err := client.CreatePayin(ctx, payment.CreatePayinRequest{
+resp, err := client.CreatePayin(ctx, merchant, payment.CreatePayinRequest{
 	MerchantOrderID: "PAYIN-202606090001",
 	Amount:          10000,
 	Currency:        "USD",
@@ -44,7 +51,7 @@ Use `resp.Link` to redirect payer when gateway returns a payment link.
 ## Create Payout
 
 ```go
-resp, err := client.CreatePayout(ctx, payment.CreatePayoutRequest{
+resp, err := client.CreatePayout(ctx, merchant, payment.CreatePayoutRequest{
 	MerchantOrderID: "PAYOUT-202606090001",
 	Amount:          50000,
 	Currency:        "PHP",
@@ -62,14 +69,14 @@ resp, err := client.CreatePayout(ctx, payment.CreatePayoutRequest{
 ## Query Orders
 
 ```go
-payin, err := client.GetPayin(ctx, 10201312003)
-payout, err := client.GetPayout(ctx, 10201312010)
+payin, err := client.GetPayin(ctx, merchant, 10201312003)
+payout, err := client.GetPayout(ctx, merchant, 10201312010)
 ```
 
 ## Refund Payin
 
 ```go
-err := client.RefundPayin(ctx, 10201312003, payment.RefundPayinRequest{
+err := client.RefundPayin(ctx, merchant, 10201312003, payment.RefundPayinRequest{
 	Amount: 10000,
 })
 ```
@@ -86,7 +93,11 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !payment.VerifyNotifyHTTP("merchant-secret", r.Header, body) {
+	merchant := payment.Merchant{
+		ID:     "1001",
+		Secret: "merchant-secret",
+	}
+	if !payment.VerifyNotifyHTTP(merchant, r.Header, body) {
 		http.Error(w, "invalid signature", http.StatusUnauthorized)
 		return
 	}

@@ -9,8 +9,12 @@ import (
 	"strings"
 )
 
+type NotifyClient interface {
+	VerifyNotify(ctx context.Context, req VerifyNotifyRequest) bool
+}
+
 type VerifyNotifyRequest struct {
-	Secret    string
+	Merchant  Merchant
 	Timestamp string
 	Nonce     string
 	Signature string
@@ -24,13 +28,20 @@ type NotifyEvent struct {
 }
 
 func VerifyNotify(req VerifyNotifyRequest) bool {
-	expected := signNotify(req.Secret, req.Timestamp, req.Nonce, req.Body)
+	expected := signNotify(req.Merchant.Secret, req.Timestamp, req.Nonce, req.Body)
 	return hmac.Equal([]byte(strings.TrimSpace(req.Signature)), []byte(expected))
 }
 
-func VerifyNotifyHTTP(secret string, header http.Header, body []byte) bool {
+func VerifyNotifyHTTP(merchant Merchant, header http.Header, body []byte) bool {
+	merchantID := strings.TrimSpace(merchant.ID)
+	if merchantID == "" || strings.TrimSpace(merchant.Secret) == "" {
+		return false
+	}
+	if got := strings.TrimSpace(header.Get(headerMerchantID)); got != "" && got != merchantID {
+		return false
+	}
 	return VerifyNotify(VerifyNotifyRequest{
-		Secret:    secret,
+		Merchant:  merchant,
 		Timestamp: header.Get(headerTimestamp),
 		Nonce:     header.Get(headerNonce),
 		Signature: header.Get(headerSignature),

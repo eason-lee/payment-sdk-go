@@ -10,13 +10,13 @@ import (
 )
 
 func main() {
-	client := payment.NewClient(payment.Config{
-		BaseURL:    os.Getenv("PAYMENT_BASE_URL"),
-		MerchantID: os.Getenv("PAYMENT_MERCHANT_ID"),
-		Secret:     os.Getenv("PAYMENT_SECRET"),
-	})
+	client := payment.NewClient(payment.Production())
+	merchant := payment.Merchant{
+		ID:     os.Getenv("PAYMENT_MERCHANT_ID"),
+		Secret: os.Getenv("PAYMENT_SECRET"),
+	}
 
-	resp, err := client.CreatePayout(context.Background(), payment.CreatePayoutRequest{
+	resp, err := client.CreatePayout(context.Background(), merchant, payment.CreatePayoutReq{
 		MerchantOrderID: "PAYOUT-202606090001",
 		Amount:          50000,
 		Currency:        "PHP",
