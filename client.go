@@ -3,6 +3,7 @@ package payment
 import (
 	"context"
 	"net/http"
+	"time"
 )
 
 // Client calls payment merchant gateway APIs.
@@ -40,9 +41,15 @@ type NotifyClient interface {
 }
 
 func NewClient(env EnvType) *ClientImpl {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+
 	return &ClientImpl{
-		baseURL:    env.GetBaseURL(),
-		httpClient: newHTTPClient(),
+		baseURL: env.GetBaseURL(),
+		httpClient: &http.Client{
+			Transport: transport,
+			Timeout:   15 * time.Second,
+		},
 	}
 }
 

@@ -32,7 +32,12 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &ClientImpl{baseURL: server.URL}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	client := &ClientImpl{
+		baseURL:    server.URL,
+		httpClient: &http.Client{Transport: transport},
+	}
 	resp, err := client.CreatePayin(context.Background(), CreatePayinReq{
 		Merchant:        testMerchant,
 		MerchantOrderID: "M-2001",
