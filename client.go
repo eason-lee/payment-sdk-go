@@ -11,6 +11,7 @@ type Client interface {
 	RefundPayin(ctx context.Context, merchant Merchant, orderID int64, req RefundPayinReq) error
 	CreatePayout(ctx context.Context, req CreatePayoutReq) (*CreatePayoutResp, error)
 	GetPayout(ctx context.Context, merchant Merchant, orderID int64) (*PayoutOrderResp, error)
+	ParseNotify(ctx context.Context, notify Notify) (*NotifyResp, error)
 }
 
 func NewClient(env EnvType) *ClientImpl {
@@ -20,18 +21,18 @@ func NewClient(env EnvType) *ClientImpl {
 }
 
 type Merchant struct {
-	ID     string `validate:"required"`
+	ID     int64 `validate:"required"`
 	Secret string `validate:"required"`
 }
 
 // CreatePayinReq creates a pay-in order.
 type CreatePayinReq struct {
 	Merchant
-	MerchantOrderID string      `json:"merchant_order_id"`
-	Amount          int64       `json:"amount"`
-	Currency        CurrencyTp  `json:"currency"`
-	PayMethod       PayMethod   `json:"pay_method"`
-	PayMode         PayMode     `json:"pay_mode"`
+	MerchantOrderID string      `json:"merchant_order_id" validate:"required"`
+	Amount          int64       `json:"amount" validate:"gt=0"`
+	Currency        CurrencyTp  `json:"currency" validate:"oneof=USD"`
+	PayMethod       PayMethod   `json:"pay_method" validate:"oneof=PayPal"`
+	PayMode         PayMode     `json:"pay_mode" validate:"validateFn=Valid"`
 	User            *User       `json:"user,omitempty"`
 	PayPal          *PayPal     `json:"paypal,omitempty"`
 	ApplePay        *ApplePay   `json:"apple_pay,omitempty"`
@@ -40,7 +41,7 @@ type CreatePayinReq struct {
 }
 
 func (c CreatePayinReq) Valid() error {
-	return 
+	return ValidStruct(c)
 }
 
 type PayPal struct {

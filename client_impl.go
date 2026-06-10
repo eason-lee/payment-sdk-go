@@ -31,7 +31,7 @@ func (c *ClientImpl) CreatePayin(ctx context.Context, req CreatePayinReq) (*Crea
 	if err := req.Valid(); err != nil {
 		return nil, err
 	}
-	
+
 	var out CreatePayinResp
 	if err := c.doJSON(ctx, req.Merchant, http.MethodPost, "/api/payin/order", req, &out); err != nil {
 		return nil, err
@@ -68,8 +68,8 @@ func (c *ClientImpl) GetPayout(ctx context.Context, merchant Merchant, orderID i
 }
 
 func (c *ClientImpl) doJSON(ctx context.Context, merchant Merchant, method string, path string, body any, out any) error {
-	merchantID := strings.TrimSpace(merchant.ID)
-	if merchantID == "" {
+	merchantID := merchant.ID
+	if merchantID <= 0 {
 		return errors.New("payment: merchant id is required")
 	}
 	if strings.TrimSpace(merchant.Secret) == "" {
@@ -107,7 +107,7 @@ func (c *ClientImpl) doJSON(ctx context.Context, merchant Merchant, method strin
 		Body:      rawBody,
 	})
 
-	req.Header.Set(headerMerchantID, merchantID)
+	req.Header.Set(headerMerchantID, fmt.Sprintf("%d", merchantID))
 	req.Header.Set(headerTimestamp, timestamp)
 	req.Header.Set(headerNonce, nonce)
 	req.Header.Set(headerSignature, signature)
@@ -194,4 +194,15 @@ func (c *ClientImpl) signRequest(secret string, in signRequestInput) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(payload.String()))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func (c *ClientImpl) ParseNotify(ctx context.Context, notify *Notify) (*NotifyResp, error) {
+	if err := notify.Validate(); err != nil {
+		return nil, err
+	}
+	req := notify.ToNotifyReq()
+	if ok := req.Verify(); !ok {
+		return nil, errors.New("payment: verify notify request failed")
+	}
+	return req.ToNotifyResp()
 }
