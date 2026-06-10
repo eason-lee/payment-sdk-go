@@ -8,15 +8,33 @@ import (
 // Client calls payment merchant gateway APIs.
 type Client interface {
 	CreatePayin(ctx context.Context, req CreatePayinReq) (*CreatePayinResp, error)
-	GetPayin(ctx context.Context, merchant Merchant, orderID int64) (*PayinOrderResp, error)
-	RefundPayin(ctx context.Context, merchant Merchant, orderID int64, req RefundPayinReq) error
+	GetPayin(ctx context.Context, req GetPayinReq) (*PayinOrderResp, error)
+	RefundPayin(ctx context.Context, req RefundPayinReq) error
 	CreatePayout(ctx context.Context, req CreatePayoutReq) (*CreatePayoutResp, error)
-	GetPayout(ctx context.Context, merchant Merchant, orderID int64) (*PayoutOrderResp, error)
+	GetPayout(ctx context.Context, req GetPayoutReq) (*PayoutOrderResp, error)
 	NotifyClient
 }
 
+type GetPayinReq struct {
+	Merchant
+	OrderID int64 `json:"order_id" validate:"required"`
+}
+
+func (r GetPayinReq) Valid() error {
+	return ValidStruct(r)
+}
+
+type GetPayoutReq struct {
+	Merchant
+	OrderID int64 `json:"order_id" validate:"required"`
+}
+
+func (r GetPayoutReq) Valid() error {
+	return ValidStruct(r)
+}
+
 type NotifyClient interface {
-	HandleNotify(ctx context.Context, notify *Notify) (*NotifyResp, error)
+	ParseNotify(ctx context.Context, notify *Notify) (*NotifyResp, error)
 	NotifySuccess(w http.ResponseWriter)
 	NotifyFailed(w http.ResponseWriter)
 }
@@ -28,8 +46,8 @@ func NewClient(env EnvType) *ClientImpl {
 }
 
 type Merchant struct {
-	ID     int64  `validate:"required"`
-	Secret string `validate:"required"`
+	ID     int64  `json:"id" validate:"gt=0"`
+	Secret string `json:"secret" validate:"required"`
 }
 
 type CreatePayinReq struct {
@@ -38,7 +56,7 @@ type CreatePayinReq struct {
 	Amount          int64       `json:"amount" validate:"gt=0"`
 	Currency        CurrencyTp  `json:"currency" validate:"oneof=USD"`
 	PayMethod       PayMethod   `json:"pay_method" validate:"oneof=PayPal"`
-	PayMode         PayMode     `json:"pay_mode" validate:"validateFn=Valid"`
+	PayMode         PayMode     `json:"pay_mode" validate:"required"`
 	User            *User       `json:"user,omitempty"`
 	PayPal          *PayPal     `json:"paypal,omitempty"`
 	ApplePay        *ApplePay   `json:"apple_pay,omitempty"`
@@ -46,12 +64,19 @@ type CreatePayinReq struct {
 	GooglePay       *GooglePay  `json:"google_pay,omitempty"`
 }
 
+func (r CreatePayinReq) Valid() error {
+	if err := r.PayMode.Valid(); err != nil {
+		return err
+	}
+	return ValidStruct(r)
+}
+
 type User struct {
-	ID      string `json:"user_id"`
-	AppName string `json:"app_name"`
-	Name    string `json:"user_name,omitempty"`
-	Email   string `json:"user_email,omitempty"`
-	Phone   string `json:"user_phone,omitempty"`
+	ID      string `json:"id" validate:"required"`
+	AppName string `json:"app_name" validate:"required"`
+	Name    string `json:"name,omitempty"`
+	Email   string `json:"email,omitempty"`
+	Phone   string `json:"phone,omitempty"`
 }
 
 type PayPal struct {
@@ -100,17 +125,27 @@ type PayinOrderResp struct {
 }
 
 type RefundPayinReq struct {
-	Amount float64 `json:"amount"`
+	Merchant
+	OrderID int64   `json:"order_id" validate:"required"`
+	Amount  float64 `json:"amount" validate:"gt=0"`
+}
+
+func (r RefundPayinReq) Valid() error {
+	return ValidStruct(r)
 }
 
 type CreatePayoutReq struct {
 	Merchant
-	MerchantOrderID string     `json:"merchant_order_id"`
-	Amount          int64      `json:"amount"`
-	Currency        CurrencyTp `json:"currency"`
-	PayMethod       PayMethod  `json:"pay_method"`
-	Account         string     `json:"account"`
+	MerchantOrderID string     `json:"merchant_order_id" validate:"required"`
+	Amount          int64      `json:"amount" validate:"gt=0"`
+	Currency        CurrencyTp `json:"currency" validate:"oneof=USD"`
+	PayMethod       PayMethod  `json:"pay_method" validate:"oneof=PayPal"`
+	Account         string     `json:"account" validate:"required"`
 	User            *User      `json:"user,omitempty"`
+}
+
+func (r CreatePayoutReq) Valid() error {
+	return ValidStruct(r)
 }
 
 type CreatePayoutResp struct {

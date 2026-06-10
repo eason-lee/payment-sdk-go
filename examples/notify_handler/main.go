@@ -26,8 +26,8 @@ func notifyHandler(w http.ResponseWriter, r *http.Request, merchant payment.Merc
 		http.Error(w, "read body failed", http.StatusBadRequest)
 		return
 	}
-	client := payment.NewClient(payment.EnvProduction)
-	event, err := client.HandleNotify(
+	client := payment.NewClient(payment.Production())
+	event, err := client.ParseNotify(
 		r.Context(),
 		&payment.Notify{
 			Merchant: merchant,

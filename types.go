@@ -2,15 +2,13 @@ package payment
 
 import "errors"
 
-
 const (
 	headerMerchantID = "X-Merchant-Id"
 	headerTimestamp  = "X-Timestamp"
 	headerNonce      = "X-Nonce"
 	headerSignature  = "X-Signature"
-	headerNotifyTp = "X-Notify-Tp"
+	headerNotifyTp   = "X-Notify-Tp"
 )
-
 
 // PayMethod 支付方法
 type PayMethod string
@@ -72,6 +70,14 @@ func (p EnvType) GetBaseURL() string {
 	default:
 		return ""
 	}
+}
+
+func Production() EnvType {
+	return EnvProduction
+}
+
+func Sandbox() EnvType {
+	return EnvSandbox
 }
 
 // MerchantNotifyTp 表示商户通知回调类型。

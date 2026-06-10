@@ -22,8 +22,6 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("payment: api error: status=%d body=%q", e.StatusCode, string(e.Body))
 }
 
-
-
 func ValidStruct(obj any) error {
 	return validator.New().Struct(obj)
 }

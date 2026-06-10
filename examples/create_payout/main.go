@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	client := payment.NewClient(payment.EnvProduction)
+	client := payment.NewClient(payment.Production())
 	merchant := payment.Merchant{
 		ID:     1001,
 		Secret: "xxxx",

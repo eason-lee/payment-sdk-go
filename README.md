@@ -99,15 +99,12 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 		ID:     1001,
 		Secret: "merchant-secret",
 	}
-	if !payment.VerifyNotifyHTTP(merchant, r.Header, body) {
-		http.Error(w, "invalid signature", http.StatusUnauthorized)
-		return
-	}
-
-	event, err := payment.NewClient(payment.Production()).ParseNotify(
-		r.Context(),
-		payment.NewNotify(merchant, r.Header, body),
-	)
+	client := payment.NewClient(payment.Production())
+	event, err := client.ParseNotify(r.Context(), &payment.Notify{
+		Merchant: merchant,
+		Header:   r.Header,
+		Body:     body,
+	})
 	if err != nil {
 		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
@@ -120,7 +117,7 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 		// Handle idempotently by event.PayoutOrder.OrderID or MerchantOrderId.
 	}
 
-	payment.WriteNotifyAck(w)
+	client.NotifySuccess(w)
 }
 ```
 

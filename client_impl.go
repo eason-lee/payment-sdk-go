@@ -21,6 +21,10 @@ type ClientImpl struct {
 }
 
 func (c *ClientImpl) CreatePayin(ctx context.Context, req CreatePayinReq) (*CreatePayinResp, error) {
+	if err := req.Valid(); err != nil {
+		return nil, err
+	}
+
 	var out CreatePayinResp
 	if err := c.doJSON(ctx, req.Merchant, http.MethodPost, "/api/payin/order", req, &out); err != nil {
 		return nil, err
@@ -28,27 +32,31 @@ func (c *ClientImpl) CreatePayin(ctx context.Context, req CreatePayinReq) (*Crea
 	return &out, nil
 }
 
-func (c *ClientImpl) GetPayin(ctx context.Context, merchant Merchant, orderID int64) (*PayinOrderResp, error) {
-	if orderID <= 0 {
-		return nil, errors.New("payment: order id is required")
+func (c *ClientImpl) GetPayin(ctx context.Context, req GetPayinReq) (*PayinOrderResp, error) {
+	if err := req.Valid(); err != nil {
+		return nil, err
 	}
 
 	var out PayinOrderResp
-	if err := c.doJSON(ctx, merchant, http.MethodGet, fmt.Sprintf("/api/payin/order/%d", orderID), nil, &out); err != nil {
+	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payin/order/%d", req.OrderID), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
 }
 
-func (c *ClientImpl) RefundPayin(ctx context.Context, merchant Merchant, orderID int64, req RefundPayinReq) error {
-	if orderID <= 0 {
-		return errors.New("payment: order id is required")
+func (c *ClientImpl) RefundPayin(ctx context.Context, req RefundPayinReq) error {
+	if err := req.Valid(); err != nil {
+		return err
 	}
 
-	return c.doJSON(ctx, merchant, http.MethodPost, fmt.Sprintf("/api/payin/order/%d/refund", orderID), req, nil)
+	return c.doJSON(ctx, req.Merchant, http.MethodPost, fmt.Sprintf("/api/payin/order/%d/refund", req.OrderID), req, nil)
 }
 
 func (c *ClientImpl) CreatePayout(ctx context.Context, req CreatePayoutReq) (*CreatePayoutResp, error) {
+	if err := req.Valid(); err != nil {
+		return nil, err
+	}
+
 	var out CreatePayoutResp
 	if err := c.doJSON(ctx, req.Merchant, http.MethodPost, "/api/payout/order", req, &out); err != nil {
 		return nil, err
@@ -56,13 +64,13 @@ func (c *ClientImpl) CreatePayout(ctx context.Context, req CreatePayoutReq) (*Cr
 	return &out, nil
 }
 
-func (c *ClientImpl) GetPayout(ctx context.Context, merchant Merchant, orderID int64) (*PayoutOrderResp, error) {
-	if orderID <= 0 {
-		return nil, errors.New("payment: order id is required")
+func (c *ClientImpl) GetPayout(ctx context.Context, req GetPayoutReq) (*PayoutOrderResp, error) {
+	if err := req.Valid(); err != nil {
+		return nil, err
 	}
 
 	var out PayoutOrderResp
-	if err := c.doJSON(ctx, merchant, http.MethodGet, fmt.Sprintf("/api/payout/order/%d", orderID), nil, &out); err != nil {
+	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payout/order/%d", req.OrderID), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -197,7 +205,7 @@ func (c *ClientImpl) signRequest(secret string, in signRequestInput) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-func (c *ClientImpl) HandleNotify(ctx context.Context, notify *Notify) (*NotifyResp, error) {
+func (c *ClientImpl) ParseNotify(ctx context.Context, notify *Notify) (*NotifyResp, error) {
 	if notify == nil {
 		return nil, errors.New("payment: notify is required")
 	}
@@ -222,6 +230,6 @@ func (c *ClientImpl) NotifySuccess(w http.ResponseWriter) {
 
 func (c *ClientImpl) NotifyFailed(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusInternalServerError)
 	_, _ = w.Write([]byte(`{"status":"failed"}`))
 }
