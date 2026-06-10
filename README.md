@@ -1,88 +1,91 @@
 # Payment Go SDK
 
-Go SDK for payment merchant gateway.
+Payment 商户网关 Go SDK，用于第三方商户服务端接入代收、代付、订单查询、代收退款和商户通知验签。
 
-## Install
+## 安装
 
 ```bash
 go get github.com/eason-lee/payment-sdk-go@v0.1.1
 ```
 
-## Create Client
+## 创建客户端
 
 ```go
 client := payment.NewClient(payment.Production())
+```
+
+当前环境：
+
+- `Production()`：正式环境，目前指向 `http://192.168.1.171`
+- `Sandbox()`：本地验证环境，目前指向 `http://127.0.0.1:8080`
+
+如果后续测试环境域名独立，接入方只需要切换初始化环境：
+
+```go
+client := payment.NewClient(payment.Sandbox())
+```
+
+## 商户信息
+
+每次请求都需要传入商户 ID 和商户密钥：
+
+```go
 merchant := payment.Merchant{
 	ID:     1001,
 	Secret: "merchant-secret",
 }
 ```
 
-`Production()` points to `http://192.168.1.171`.
-`Sandbox()` is currently used for local verification and points to `http://127.0.0.1:8080`.
-When sandbox domain becomes separate, only client init needs to switch:
+`Merchant.Secret` 只能保存在商户服务端，不能暴露到浏览器、移动端或前端包里。
 
-```go
-client := payment.NewClient(payment.Sandbox())
-```
-
-`Merchant.Secret` must stay on merchant server. Never expose it in browser, mobile app, or client-side bundle.
-
-## Create Payin
+## 创建代收订单
 
 ```go
 resp, err := client.CreatePayin(ctx, payment.CreatePayinReq{
 	Merchant:        merchant,
 	MerchantOrderID: "PAYIN-202606090001",
 	Amount:          10000,
-	Currency:        "USD",
+	Currency:        payment.CurrencyTpUSD,
 	PayMethod:       payment.PayMethodPayPal,
 	PayMode:         payment.PayModePayPalAgreement,
 	User: &payment.User{
 		ID:      "u_1001",
 		AppName: "DemoApp",
+		Name:    "John Doe",
+		Email:   "john@example.com",
+		Phone:   "+10000000000",
 	},
 	PayPal: &payment.PayPal{
 		Email: "buyer@example.com",
 	},
 })
+if err != nil {
+	return err
+}
 ```
 
-Use `resp.Link` to redirect payer when gateway returns a payment link.
-
-## Create Payout
+返回值：
 
 ```go
-resp, err := client.CreatePayout(ctx, payment.CreatePayoutReq{
-	Merchant:        merchant,
-	MerchantOrderID: "PAYOUT-202606090001",
-	Amount:          50000,
-	Currency:        "USD",
-	PayMethod:       payment.PayMethodPayPal,
-	Account:         "payer@example.com",
-	User: &payment.User{
-		ID:      "u_1001",
-		AppName: "DemoApp",
-		Name:    "John Doe",
-		Email:   "john@example.com",
-	},
-})
+fmt.Println(resp.OrderID)
+fmt.Println(resp.Link)
 ```
 
-## Query Orders
+如果 `resp.Link` 不为空，商户可以把用户跳转到该链接完成支付。
+
+## 查询代收订单
 
 ```go
 payin, err := client.GetPayin(ctx, payment.GetPayinReq{
 	Merchant: merchant,
 	OrderID:  10201312003,
 })
-payout, err := client.GetPayout(ctx, payment.GetPayoutReq{
-	Merchant: merchant,
-	OrderID:  10201312010,
-})
+if err != nil {
+	return err
+}
 ```
 
-## Refund Payin
+## 代收退款
 
 ```go
 err := client.RefundPayin(ctx, payment.RefundPayinReq{
@@ -90,11 +93,56 @@ err := client.RefundPayin(ctx, payment.RefundPayinReq{
 	OrderID:  10201312003,
 	Amount:   10000,
 })
+if err != nil {
+	return err
+}
 ```
 
-## Receive Notify
+## 创建代付订单
 
-Notification verification must use raw request body.
+```go
+resp, err := client.CreatePayout(ctx, payment.CreatePayoutReq{
+	Merchant:        merchant,
+	MerchantOrderID: "PAYOUT-202606090001",
+	Amount:          50000,
+	Currency:        payment.CurrencyTpUSD,
+	PayMethod:       payment.PayMethodPayPal,
+	Account:         "receiver@example.com",
+	User: &payment.User{
+		ID:      "u_1001",
+		AppName: "DemoApp",
+		Name:    "John Doe",
+		Email:   "john@example.com",
+		Phone:   "+10000000000",
+	},
+})
+if err != nil {
+	return err
+}
+```
+
+返回值：
+
+```go
+fmt.Println(resp.OrderID)
+fmt.Println(resp.ChannelOrderID)
+```
+
+## 查询代付订单
+
+```go
+payout, err := client.GetPayout(ctx, payment.GetPayoutReq{
+	Merchant: merchant,
+	OrderID:  10201312010,
+})
+if err != nil {
+	return err
+}
+```
+
+## 接收商户通知
+
+通知验签必须使用 HTTP 请求的原始 body，不能先反序列化再重新序列化。
 
 ```go
 func notifyHandler(w http.ResponseWriter, r *http.Request) {
@@ -104,44 +152,71 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	client := payment.NewClient(payment.Production())
 	merchant := payment.Merchant{
 		ID:     1001,
 		Secret: "merchant-secret",
 	}
-	client := payment.NewClient(payment.Production())
+
 	event, err := client.ParseNotify(r.Context(), &payment.Notify{
 		Merchant: merchant,
 		Header:   r.Header,
 		Body:     body,
 	})
 	if err != nil {
-		http.Error(w, "invalid payload", http.StatusBadRequest)
+		client.NotifyFailed(w)
 		return
 	}
 
 	switch event.Tp {
 	case payment.MerchantNotifyTpPayIn:
-		// Handle idempotently by event.PayinOrder.OrderID or MerchantOrderId.
+		// 按 event.PayinOrder.OrderID 或 MerchantOrderId 做幂等处理。
 	case payment.MerchantNotifyTpPayOut:
-		// Handle idempotently by event.PayoutOrder.OrderID or MerchantOrderId.
+		// 按 event.PayoutOrder.OrderID 或 MerchantOrderId 做幂等处理。
+	case payment.MerchantNotifyTpPayInRefund:
+		// 处理代收退款通知。
+	case payment.MerchantNotifyTpPayInDispute:
+		// 处理代收争议通知。
+	case payment.MerchantNotifyTpPayInAgreement:
+		// 处理代收协议签约通知。
 	}
 
 	client.NotifySuccess(w)
 }
 ```
 
-## Error Handling
+通知类型：
+
+| 类型 | 说明 |
+|---|---|
+| `MerchantNotifyTpPayIn` | 代收订单通知 |
+| `MerchantNotifyTpPayInRefund` | 代收退款通知 |
+| `MerchantNotifyTpPayInDispute` | 代收争议通知 |
+| `MerchantNotifyTpPayOut` | 代付订单通知 |
+| `MerchantNotifyTpPayInAgreement` | 代收协议签约通知 |
+
+`NotifySuccess` 会返回 HTTP 200，表示商户已经成功处理通知。
+
+`NotifyFailed` 会返回 HTTP 500，表示商户处理失败，Payment 可以按重试策略再次通知。
+
+## 错误处理
+
+接口返回非 2xx 时，SDK 会返回 `*payment.APIError`：
 
 ```go
 var apiErr *payment.APIError
 if errors.As(err, &apiErr) {
-	fmt.Println(apiErr.StatusCode, apiErr.Message)
+	fmt.Println(apiErr.StatusCode)
+	fmt.Println(apiErr.Message)
+	fmt.Println(string(apiErr.Body))
 }
 ```
 
-## Security Notes
+## 接入注意事项
 
-- Keep merchant secret on server.
-- Do not retry write APIs automatically unless your business idempotency is clear.
-- Verify notification signature before parsing business payload.
-- Store notification handling result idempotently before returning ack.
+- 所有金额单位都是分。
+- `MerchantOrderID` 由商户生成，建议保证唯一。
+- 写接口不要无脑自动重试，除非业务侧已经做好幂等。
+- 通知处理必须先验签，再处理业务。
+- 通知业务落库成功后再返回 `NotifySuccess`。
+- 商户密钥只能放在服务端，不能传给前端。
