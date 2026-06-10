@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	payment "github.com/bigword/payment-sdk-go"
+	payment "github.com/eason-lee/payment-sdk-go"
 )
 
 func main() {

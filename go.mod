@@ -1,4 +1,4 @@
-module github.com/bigword/payment-sdk-go
+module github.com/eason-lee/payment-sdk-go
 
 go 1.25.0
 

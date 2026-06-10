@@ -122,7 +122,11 @@ func (c *ClientImpl) doJSON(ctx context.Context, merchant Merchant, method strin
 	req.Header.Set(headerNonce, nonce)
 	req.Header.Set(headerSignature, signature)
 
-	resp, err := c.httpClient.Do(req)
+	httpClient := c.httpClient
+	if httpClient == nil {
+		httpClient = newHTTPClient()
+	}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -133,6 +137,15 @@ func (c *ClientImpl) doJSON(ctx context.Context, merchant Merchant, method strin
 		return fmt.Errorf("payment: read response body: %w", err)
 	}
 	return c.decodeResponse(resp.StatusCode, respBody, out)
+}
+
+func newHTTPClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	return &http.Client{
+		Transport: transport,
+		Timeout:   15 * time.Second,
+	}
 }
 
 type responseEnvelope struct {

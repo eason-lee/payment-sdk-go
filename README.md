@@ -5,7 +5,7 @@ Go SDK for payment merchant gateway.
 ## Install
 
 ```bash
-go get github.com/bigword/payment-sdk-go
+go get github.com/eason-lee/payment-sdk-go@v0.1.0
 ```
 
 ## Create Client
@@ -18,8 +18,9 @@ merchant := payment.Merchant{
 }
 ```
 
-`Production()` and `Sandbox()` currently point to `http://192.168.1.171`.
-When sandbox domain becomes separate, switch client init only:
+`Production()` points to `http://192.168.1.171`.
+`Sandbox()` is currently used for local verification and points to `http://127.0.0.1:8080`.
+When sandbox domain becomes separate, only client init needs to switch:
 
 ```go
 client := payment.NewClient(payment.Sandbox())
@@ -37,7 +38,7 @@ resp, err := client.CreatePayin(ctx, payment.CreatePayinReq{
 	Currency:        "USD",
 	PayMethod:       payment.PayMethodPayPal,
 	PayMode:         payment.PayModePayPalAgreement,
-	User: &payment.PayinUser{
+	User: &payment.User{
 		ID:      "u_1001",
 		AppName: "DemoApp",
 	},
@@ -59,7 +60,7 @@ resp, err := client.CreatePayout(ctx, payment.CreatePayoutReq{
 	Currency:        "USD",
 	PayMethod:       payment.PayMethodPayPal,
 	Account:         "payer@example.com",
-	User: &payment.PayoutUser{
+	User: &payment.User{
 		ID:      "u_1001",
 		AppName: "DemoApp",
 		Name:    "John Doe",
@@ -71,15 +72,23 @@ resp, err := client.CreatePayout(ctx, payment.CreatePayoutReq{
 ## Query Orders
 
 ```go
-payin, err := client.GetPayin(ctx, merchant, 10201312003)
-payout, err := client.GetPayout(ctx, merchant, 10201312010)
+payin, err := client.GetPayin(ctx, payment.GetPayinReq{
+	Merchant: merchant,
+	OrderID:  10201312003,
+})
+payout, err := client.GetPayout(ctx, payment.GetPayoutReq{
+	Merchant: merchant,
+	OrderID:  10201312010,
+})
 ```
 
 ## Refund Payin
 
 ```go
-err := client.RefundPayin(ctx, merchant, 10201312003, payment.RefundPayinReq{
-	Amount: 10000,
+err := client.RefundPayin(ctx, payment.RefundPayinReq{
+	Merchant: merchant,
+	OrderID:  10201312003,
+	Amount:   10000,
 })
 ```
 
