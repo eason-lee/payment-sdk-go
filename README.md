@@ -5,7 +5,7 @@ Go SDK for payment merchant gateway.
 ## Install
 
 ```bash
-go get github.com/eason-lee/payment-sdk-go@v0.1.0
+go get github.com/eason-lee/payment-sdk-go@v0.1.1
 ```
 
 ## Create Client
