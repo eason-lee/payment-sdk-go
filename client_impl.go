@@ -17,7 +17,8 @@ import (
 )
 
 type ClientImpl struct {
-	baseURL string
+	baseURL    string
+	httpClient *http.Client
 }
 
 func (c *ClientImpl) CreatePayin(ctx context.Context, req CreatePayinReq) (*CreatePayinResp, error) {
@@ -121,7 +122,7 @@ func (c *ClientImpl) doJSON(ctx context.Context, merchant Merchant, method strin
 	req.Header.Set(headerNonce, nonce)
 	req.Header.Set(headerSignature, signature)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}

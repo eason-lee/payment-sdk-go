@@ -50,7 +50,7 @@ const (
 
 const (
 	productionBaseURL = "http://192.168.1.171"
-	sandboxBaseURL    = "http://192.168.1.171"
+	sandboxBaseURL    = "http://127.0.0.1:8080"
 )
 
 type EnvType string
