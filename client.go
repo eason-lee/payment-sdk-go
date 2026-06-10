@@ -2,6 +2,7 @@ package payment
 
 import (
 	"context"
+	"net/http"
 )
 
 // Client calls payment merchant gateway APIs.
@@ -11,7 +12,13 @@ type Client interface {
 	RefundPayin(ctx context.Context, merchant Merchant, orderID int64, req RefundPayinReq) error
 	CreatePayout(ctx context.Context, req CreatePayoutReq) (*CreatePayoutResp, error)
 	GetPayout(ctx context.Context, merchant Merchant, orderID int64) (*PayoutOrderResp, error)
-	ParseNotify(ctx context.Context, notify Notify) (*NotifyResp, error)
+	NotifyClient
+}
+
+type NotifyClient interface {
+	HandleNotify(ctx context.Context, notify *Notify) (*NotifyResp, error)
+	NotifySuccess(w http.ResponseWriter)
+	NotifyFailed(w http.ResponseWriter)
 }
 
 func NewClient(env EnvType) *ClientImpl {
@@ -21,11 +28,10 @@ func NewClient(env EnvType) *ClientImpl {
 }
 
 type Merchant struct {
-	ID     int64 `validate:"required"`
+	ID     int64  `validate:"required"`
 	Secret string `validate:"required"`
 }
 
-// CreatePayinReq creates a pay-in order.
 type CreatePayinReq struct {
 	Merchant
 	MerchantOrderID string      `json:"merchant_order_id" validate:"required"`
@@ -40,8 +46,12 @@ type CreatePayinReq struct {
 	GooglePay       *GooglePay  `json:"google_pay,omitempty"`
 }
 
-func (c CreatePayinReq) Valid() error {
-	return ValidStruct(c)
+type User struct {
+	ID      string `json:"user_id"`
+	AppName string `json:"app_name"`
+	Name    string `json:"user_name,omitempty"`
+	Email   string `json:"user_email,omitempty"`
+	Phone   string `json:"user_phone,omitempty"`
 }
 
 type PayPal struct {
@@ -101,14 +111,6 @@ type CreatePayoutReq struct {
 	PayMethod       PayMethod  `json:"pay_method"`
 	Account         string     `json:"account"`
 	User            *User      `json:"user,omitempty"`
-}
-
-type User struct {
-	ID      string `json:"id" validate:"required"`
-	AppName string `json:"app_name" validate:"required"`
-	Name    string `json:"name,omitempty"`
-	Email   string `json:"email,omitempty"`
-	Phone   string `json:"phone,omitempty"`
 }
 
 type CreatePayoutResp struct {

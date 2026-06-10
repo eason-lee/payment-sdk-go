@@ -13,7 +13,7 @@ go get github.com/bigword/payment-sdk-go
 ```go
 client := payment.NewClient(payment.Production())
 merchant := payment.Merchant{
-	ID:     "1001",
+	ID:     1001,
 	Secret: "merchant-secret",
 }
 ```
@@ -30,14 +30,15 @@ client := payment.NewClient(payment.Sandbox())
 ## Create Payin
 
 ```go
-resp, err := client.CreatePayin(ctx, merchant, payment.CreatePayinRequest{
+resp, err := client.CreatePayin(ctx, payment.CreatePayinReq{
+	Merchant:        merchant,
 	MerchantOrderID: "PAYIN-202606090001",
 	Amount:          10000,
 	Currency:        "USD",
 	PayMethod:       payment.PayMethodPayPal,
 	PayMode:         payment.PayModePayPalAgreement,
 	User: &payment.PayinUser{
-		UserID:  "u_1001",
+		ID:      "u_1001",
 		AppName: "DemoApp",
 	},
 	PayPal: &payment.PayPal{
@@ -51,12 +52,13 @@ Use `resp.Link` to redirect payer when gateway returns a payment link.
 ## Create Payout
 
 ```go
-resp, err := client.CreatePayout(ctx, merchant, payment.CreatePayoutRequest{
+resp, err := client.CreatePayout(ctx, payment.CreatePayoutReq{
+	Merchant:        merchant,
 	MerchantOrderID: "PAYOUT-202606090001",
 	Amount:          50000,
-	Currency:        "PHP",
-	PayMethod:       payment.PayMethodGCash,
-	Account:         "09171234567",
+	Currency:        "USD",
+	PayMethod:       payment.PayMethodPayPal,
+	Account:         "payer@example.com",
 	User: &payment.PayoutUser{
 		ID:      "u_1001",
 		AppName: "DemoApp",
@@ -76,7 +78,7 @@ payout, err := client.GetPayout(ctx, merchant, 10201312010)
 ## Refund Payin
 
 ```go
-err := client.RefundPayin(ctx, merchant, 10201312003, payment.RefundPayinRequest{
+err := client.RefundPayin(ctx, merchant, 10201312003, payment.RefundPayinReq{
 	Amount: 10000,
 })
 ```
@@ -94,7 +96,7 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	merchant := payment.Merchant{
-		ID:     "1001",
+		ID:     1001,
 		Secret: "merchant-secret",
 	}
 	if !payment.VerifyNotifyHTTP(merchant, r.Header, body) {
@@ -102,20 +104,20 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	event, err := payment.ParseNotify(body)
+	event, err := payment.NewClient(payment.Production()).ParseNotify(
+		r.Context(),
+		payment.NewNotify(merchant, r.Header, body),
+	)
 	if err != nil {
 		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
 	}
 
-	switch event.NotifyType {
-	case payment.NotifyTypePayin:
-		var payload payment.PayinNotify
-		if err := event.Decode(&payload); err != nil {
-			http.Error(w, "invalid payin payload", http.StatusBadRequest)
-			return
-		}
-		// Handle idempotently by payload.OrderID or payload.MerchantOrderID.
+	switch event.Tp {
+	case payment.MerchantNotifyTpPayIn:
+		// Handle idempotently by event.PayinOrder.OrderID or MerchantOrderId.
+	case payment.MerchantNotifyTpPayOut:
+		// Handle idempotently by event.PayoutOrder.OrderID or MerchantOrderId.
 	}
 
 	payment.WriteNotifyAck(w)

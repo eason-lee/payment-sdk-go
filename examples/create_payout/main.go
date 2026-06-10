@@ -4,25 +4,25 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 
 	payment "github.com/bigword/payment-sdk-go"
 )
 
 func main() {
-	client := payment.NewClient(payment.Production())
+	client := payment.NewClient(payment.EnvProduction)
 	merchant := payment.Merchant{
-		ID:     os.Getenv("PAYMENT_MERCHANT_ID"),
-		Secret: os.Getenv("PAYMENT_SECRET"),
+		ID:     1001,
+		Secret: "xxxx",
 	}
 
-	resp, err := client.CreatePayout(context.Background(), merchant, payment.CreatePayoutReq{
+	resp, err := client.CreatePayout(context.Background(), payment.CreatePayoutReq{
+		Merchant:        merchant,
 		MerchantOrderID: "PAYOUT-202606090001",
 		Amount:          50000,
-		Currency:        "PHP",
-		PayMethod:       payment.PayMethodGCash,
-		Account:         "09171234567",
-		User: &payment.PayoutUser{
+		Currency:        "USD",
+		PayMethod:       payment.PayMethodPayPal,
+		Account:         "payer@example.com",
+		User: &payment.User{
 			ID:      "u_1001",
 			AppName: "DemoApp",
 			Name:    "John Doe",

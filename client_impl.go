@@ -16,22 +16,11 @@ import (
 	"time"
 )
 
-const (
-	headerMerchantID = "X-Merchant-Id"
-	headerTimestamp  = "X-Timestamp"
-	headerNonce      = "X-Nonce"
-	headerSignature  = "X-Signature"
-)
-
 type ClientImpl struct {
 	baseURL string
 }
 
 func (c *ClientImpl) CreatePayin(ctx context.Context, req CreatePayinReq) (*CreatePayinResp, error) {
-	if err := req.Valid(); err != nil {
-		return nil, err
-	}
-
 	var out CreatePayinResp
 	if err := c.doJSON(ctx, req.Merchant, http.MethodPost, "/api/payin/order", req, &out); err != nil {
 		return nil, err
@@ -40,6 +29,10 @@ func (c *ClientImpl) CreatePayin(ctx context.Context, req CreatePayinReq) (*Crea
 }
 
 func (c *ClientImpl) GetPayin(ctx context.Context, merchant Merchant, orderID int64) (*PayinOrderResp, error) {
+	if orderID <= 0 {
+		return nil, errors.New("payment: order id is required")
+	}
+
 	var out PayinOrderResp
 	if err := c.doJSON(ctx, merchant, http.MethodGet, fmt.Sprintf("/api/payin/order/%d", orderID), nil, &out); err != nil {
 		return nil, err
@@ -48,6 +41,10 @@ func (c *ClientImpl) GetPayin(ctx context.Context, merchant Merchant, orderID in
 }
 
 func (c *ClientImpl) RefundPayin(ctx context.Context, merchant Merchant, orderID int64, req RefundPayinReq) error {
+	if orderID <= 0 {
+		return errors.New("payment: order id is required")
+	}
+
 	return c.doJSON(ctx, merchant, http.MethodPost, fmt.Sprintf("/api/payin/order/%d/refund", orderID), req, nil)
 }
 
@@ -60,6 +57,10 @@ func (c *ClientImpl) CreatePayout(ctx context.Context, req CreatePayoutReq) (*Cr
 }
 
 func (c *ClientImpl) GetPayout(ctx context.Context, merchant Merchant, orderID int64) (*PayoutOrderResp, error) {
+	if orderID <= 0 {
+		return nil, errors.New("payment: order id is required")
+	}
+
 	var out PayoutOrderResp
 	if err := c.doJSON(ctx, merchant, http.MethodGet, fmt.Sprintf("/api/payout/order/%d", orderID), nil, &out); err != nil {
 		return nil, err
@@ -94,7 +95,7 @@ func (c *ClientImpl) doJSON(ctx context.Context, merchant Merchant, method strin
 	}
 	req.Header.Set("Accept", "application/json")
 
-	timestamp := time.Now().Format(time.RFC3339)
+	timestamp := fmt.Sprintf("%d", time.Now().Unix())
 	nonce, err := c.generateNonce()
 	if err != nil {
 		return fmt.Errorf("payment: generate nonce: %w", err)
@@ -196,13 +197,31 @@ func (c *ClientImpl) signRequest(secret string, in signRequestInput) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-func (c *ClientImpl) ParseNotify(ctx context.Context, notify *Notify) (*NotifyResp, error) {
-	if err := notify.Validate(); err != nil {
+func (c *ClientImpl) HandleNotify(ctx context.Context, notify *Notify) (*NotifyResp, error) {
+	if notify == nil {
+		return nil, errors.New("payment: notify is required")
+	}
+	if err := notify.Valid(); err != nil {
 		return nil, err
 	}
-	req := notify.ToNotifyReq()
+	req, err := notify.ToNotifyReq()
+	if err != nil {
+		return nil, err
+	}
 	if ok := req.Verify(); !ok {
 		return nil, errors.New("payment: verify notify request failed")
 	}
 	return req.ToNotifyResp()
+}
+
+func (c *ClientImpl) NotifySuccess(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"success"}`))
+}
+
+func (c *ClientImpl) NotifyFailed(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"failed"}`))
 }

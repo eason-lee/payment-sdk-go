@@ -7,21 +7,23 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
 type NotifyResp struct {
-	MerchantID            int64                    `json:"merchant_id"`
-	Tp                    MerchantNotifyTp          `json:"tp"`
-	PayinPaylod           *NotifyOrderPaylod        `json:"payin_payload,omitempty"`
-	PayoutPaylod          *NotifyOrderPaylod        `json:"payout_payload,omitempty"`
-	PayinRefundPaylod     *NotifyAgreementPaylod    `json:"payin_refund_payload,omitempty"`
-	PayinDisputePaylod    *NotifyDisputeOrderPaylod `json:"payin_dispute_payload,omitempty"`
-	PayoutAgreementPaylod *NotifyAgreementPaylod    `json:"payout_agreement_payload,omitempty"`
+	MerchantID     int64                     `json:"merchant_id"`
+	Tp             MerchantNotifyTp          `json:"tp"`
+	PayinOrder     *NotifyOrderPayload       `json:"payin_order,omitempty"`
+	RefundOrder    *NotifyRefundOrderPayload `json:"refund_order,omitempty"`
+	DisputeOrder   *NotifyDisputePayload     `json:"dispute_order,omitempty"`
+	PayoutOrder    *NotifyOrderPayload       `json:"payout_order,omitempty"`
+	AgreementOrder *NotifyAgreementPayload   `json:"agreement_order,omitempty"`
 }
 
 type NotifyReq struct {
 	Merchant  Merchant
+	Tp        MerchantNotifyTp
 	Timestamp string
 	Nonce     string
 	Signature string
@@ -40,46 +42,84 @@ func (n *NotifyReq) Verify() bool {
 }
 
 func (n *NotifyReq) ToNotifyResp() (*NotifyResp, error) {
-	var raw map[string]any
-	if err := json.Unmarshal(n.Body, &raw); err != nil {
-		return nil, err
-	}
-	notifyType, _ := raw["notify_type"]
-	return &NotifyResp{
+
+	out := &NotifyResp{
 		MerchantID: n.Merchant.ID,
-		Tp:         MerchantNotifyTp(notifyType),
-	}, nil
+		Tp:         n.Tp,
+	}
+
+	switch n.Tp {
+	case MerchantNotifyTpPayIn:
+		var payload NotifyOrderPayload
+		if err := json.Unmarshal(n.Body, &payload); err != nil {
+			return nil, err
+		}
+		out.PayinOrder = &payload
+	case MerchantNotifyTpPayOut:
+		out.Tp = MerchantNotifyTpPayOut
+		var payload NotifyOrderPayload
+		if err := json.Unmarshal(n.Body, &payload); err != nil {
+			return nil, err
+		}
+		out.PayoutOrder = &payload
+	case MerchantNotifyTpPayInRefund:
+		out.Tp = MerchantNotifyTpPayInRefund
+		var payload NotifyRefundOrderPayload
+		if err := json.Unmarshal(n.Body, &payload); err != nil {
+			return nil, err
+		}
+		out.RefundOrder = &payload
+	case MerchantNotifyTpPayInDispute:
+		out.Tp = MerchantNotifyTpPayInDispute
+		var payload NotifyDisputePayload
+		if err := json.Unmarshal(n.Body, &payload); err != nil {
+			return nil, err
+		}
+		out.DisputeOrder = &payload
+	case MerchantNotifyTpPayInAgreement:
+		out.Tp = MerchantNotifyTpPayInAgreement
+		var payload NotifyAgreementPayload
+		if err := json.Unmarshal(n.Body, &payload); err != nil {
+			return nil, err
+		}
+		out.AgreementOrder = &payload
+	default:
+		return nil, errors.New("payment: unknown notify type")
+	}
+	return out, nil
 }
 
 type Notify struct {
 	Merchant
-	header http.Header
-	body   []byte
+	Header http.Header
+	Body   []byte
 }
 
-func (n *Notify) Validate() error {
-	mid := mustParseInt64(n.header.Get(headerMerchantID))
+func (n *Notify) Valid() error {
+	mid, err := strconv.ParseInt(strings.TrimSpace(n.Header.Get(headerMerchantID)), 10, 64)
+	if err != nil {
+		return errors.New("payment: invalid notify merchant id")
+	}
 	if mid != n.Merchant.ID {
-		return errors.New("payment: merchant id in header not equal to merchant id in body")
+		return errors.New("payment: merchant id in header not equal to merchant id")
 	}
-	
-	return ValidStruct(n)
+
+	return nil
 }
 
-func (n *Notify) ToNotifyReq() *NotifyReq {
+func (n *Notify) ToNotifyReq() (*NotifyReq, error) {
+	notifyTp, err := strconv.Atoi(n.Header.Get(headerNotifyTp))
+	if err != nil {
+		return nil, err
+	}
 	return &NotifyReq{
-		Merchant: n.Merchant,
-		Timestamp: n.header.Get(headerTimestamp),
-		Nonce:     n.header.Get(headerNonce),
-		Signature: n.header.Get(headerSignature),
-		Body:      n.body,
-	}
-}
-
-func WriteNotifyAck(w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(`{"status":"success"}`))
+		Merchant:  n.Merchant,
+		Tp:        MerchantNotifyTp(notifyTp),
+		Timestamp: n.Header.Get(headerTimestamp),
+		Nonce:     n.Header.Get(headerNonce),
+		Signature: n.Header.Get(headerSignature),
+		Body:      n.Body,
+	}, nil
 }
 
 type NotifyOrderStatus uint8
@@ -89,12 +129,12 @@ const (
 	NotifyOrderStatusFailed
 )
 
-type NotifyOrderPaylod struct {
-	OrderID         int64             `json:"orderId" validate:"required"`         // 订单ID
-	MerchantOrderId string            `json:"merchantOrderId" validate:"required"` // 商户订单ID
-	Status          NotifyOrderStatus `json:"status" validate:"oneof=1 2"`         // 订单状态
-	Fee             Money             `json:"fee" `                                // 手续费
-	FailReason      string            `json:"failReason,omitempty"`                // 失败原因
+type NotifyOrderPayload struct {
+	OrderID         int64             `json:"orderId"`
+	MerchantOrderId string            `json:"merchantOrderId"`
+	Status          NotifyOrderStatus `json:"status"`
+	Fee             Money             `json:"fee"`
+	FailReason      string            `json:"failReason,omitempty"`
 }
 
 // RefundStatus 退款状态。
@@ -107,12 +147,12 @@ const (
 	RefundStatusFailed   RefundStatus = 4 // 失败
 )
 
-type NotifyRefundOrderPaylod struct {
-	OrderID         int64        `json:"orderId" validate:"required"`         // 订单ID
-	MerchantOrderId string       `json:"merchantOrderId" validate:"required"` // 商户订单ID
-	RefundOrderId   int64        `json:"refundOrderId" validate:"required"`   // 退款订单ID
-	Status          RefundStatus `json:"status" validate:"oneof=1 2 3 4"`     // 订单状态
-	FailReason      string       `json:"failReason,omitempty"`                // 失败原因
+type NotifyRefundOrderPayload struct {
+	OrderID         int64        `json:"orderId"`
+	MerchantOrderId string       `json:"merchantOrderId"`
+	RefundOrderId   int64        `json:"refundOrderId"`
+	Status          RefundStatus `json:"status"`
+	FailReason      string       `json:"failReason,omitempty"`
 }
 
 // DisputeStatus 表示 payin 领域内的争议状态。
@@ -124,12 +164,12 @@ const (
 	DisputeStatusLose     DisputeStatus = 3 // 争议输了
 )
 
-type NotifyDisputeOrderPaylod struct {
-	OrderID         int64         `json:"orderId" validate:"required"`         // 订单ID
-	MerchantOrderId string        `json:"merchantOrderId" validate:"required"` // 商户订单ID
-	DisputeOrderId  int64         `json:"disputeOrderId" validate:"required"`  // 争议订单ID
-	Amount          Money         `json:"amount" validate:"required"`          // 争议金额
-	Status          DisputeStatus `json:"status" validate:"oneof=1 2 3"`       // 订单状态
+type NotifyDisputePayload struct {
+	OrderID         int64         `json:"orderId"`
+	MerchantOrderId string        `json:"merchantOrderId"`
+	DisputeOrderId  int64         `json:"disputeOrderId"`
+	Amount          Money         `json:"amount"`
+	Status          DisputeStatus `json:"status"`
 }
 
 type NotifyAgreementStatus uint8
@@ -139,11 +179,11 @@ const (
 	NotifyAgreementStatusCancelled
 )
 
-type NotifyAgreementPaylod struct {
-	OrderID         int64                 `json:"orderId" validate:"required"`         // 订单ID
-	MerchantOrderId string                `json:"merchantOrderId" validate:"required"` // 商户订单ID
-	AgreementID     int64                 `json:"agreementId" validate:"required"`     // 协议ID
-	Email           string                `json:"email" validate:"required"`           // 用户邮箱
-	UserID          string                `json:"userId" validate:"required"`          // 用户ID
-	Status          NotifyAgreementStatus `json:"status" validate:"oneof=1 2"`         // 协议状态
+type NotifyAgreementPayload struct {
+	OrderID         int64                 `json:"orderId"`
+	MerchantOrderId string                `json:"merchantOrderId"`
+	AgreementID     int64                 `json:"agreementId"`
+	Email           string                `json:"email"`
+	UserID          string                `json:"userId"`
+	Status          NotifyAgreementStatus `json:"status"`
 }
