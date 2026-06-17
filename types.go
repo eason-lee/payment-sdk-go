@@ -46,6 +46,8 @@ type CurrencyTp string
 
 const (
 	CurrencyTpUSD CurrencyTp = "USD" // 美元
+	CurrencyTpEUR CurrencyTp = "EUR" // 欧元
+	CurrencyTpGBP CurrencyTp = "GBP" // 英镑
 )
 
 const (
