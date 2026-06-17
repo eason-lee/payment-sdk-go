@@ -53,7 +53,7 @@ const (
 
 const (
 	productionBaseURL = "http://192.168.1.171" // TODO 生产环境地址待确认
-	sandboxBaseURL    = "http://192.168.1.171" // TODO 沙箱环境
+	sandboxBaseURL    = "http://192.168.160.191" // TODO 沙箱环境
 )
 
 type EnvType string
