@@ -1,40 +1,42 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"io"
 	"log"
 	"net/http"
-	"os"
 
 	payment "github.com/eason-lee/payment-sdk-go"
 )
 
 func main() {
-	merchant := payment.Merchant{
-		ID:     "1001",
-		Secret: os.Getenv("PAYMENT_SECRET"),
-	}
-	http.HandleFunc("/payment/notify", func(w http.ResponseWriter, r *http.Request) {
-		notifyHandler(w, r, merchant)
-	})
+	http.HandleFunc("/payment/notify", notifyHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func notifyHandler(w http.ResponseWriter, r *http.Request, merchant payment.Merchant) {
+func notifyHandler(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "read body failed", http.StatusBadRequest)
 		return
 	}
 	client := payment.NewClient(payment.Production())
-	event, err := client.ParseNotify(
-		r.Context(),
-		&payment.Notify{
-			Merchant: merchant,
-			Header:   r.Header,
-			Body:     body,
-		},
-	)
+	notify := &payment.Notify{
+		Header: r.Header,
+		Body:   body,
+	}
+	identity, err := client.GetNotifyIdentity(notify)
+	if err != nil {
+		http.Error(w, "invalid payload", http.StatusBadRequest)
+		return
+	}
+	secret, err := loadMerchantSecret(r.Context(), identity.MerchantID, identity.OrderID)
+	if err != nil {
+		http.Error(w, "invalid merchant", http.StatusBadRequest)
+		return
+	}
+	event, err := client.ParseNotify(r.Context(), secret, notify)
 	if err != nil {
 		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
@@ -48,4 +50,13 @@ func notifyHandler(w http.ResponseWriter, r *http.Request, merchant payment.Merc
 	}
 
 	client.NotifySuccess(w)
+}
+
+func loadMerchantSecret(ctx context.Context, merchantID string, orderID string) (string, error) {
+	_ = ctx
+	_ = orderID
+	if merchantID != "1001" {
+		return "", errors.New("merchant not found")
+	}
+	return "test-secret", nil
 }

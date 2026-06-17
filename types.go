@@ -8,6 +8,7 @@ const (
 	headerNonce      = "X-Nonce"
 	headerSignature  = "X-Signature"
 	headerNotifyTp   = "X-Notify-Tp"
+	headerOrderID    = "X-Order-Id"
 )
 
 // PayMethod 支付方法
@@ -51,8 +52,8 @@ const (
 )
 
 const (
-	productionBaseURL = "http://192.168.1.171"
-	sandboxBaseURL    = "http://127.0.0.1:8080"
+	productionBaseURL = "http://192.168.1.171" // TODO 生产环境地址待确认
+	sandboxBaseURL    = "http://192.168.1.171" // TODO 沙箱环境
 )
 
 type EnvType string

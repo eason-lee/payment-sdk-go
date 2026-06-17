@@ -9,7 +9,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
+
+const notifyMaxClockSkew = 5 * time.Minute
 
 type NotifyResp struct {
 	MerchantID     string                    `json:"merchant_id"`               // 商户ID
@@ -21,30 +24,58 @@ type NotifyResp struct {
 	AgreementOrder *NotifyAgreementPayload   `json:"agreement_order,omitempty"` // 协议订单通知
 }
 
+type NotifyIdentity struct {
+	MerchantID string           `json:"merchant_id"`
+	OrderID    string           `json:"order_id"`
+	Tp         MerchantNotifyTp `json:"tp"`
+}
+
 type NotifyReq struct {
-	Merchant  Merchant
-	Tp        MerchantNotifyTp
-	Timestamp string
-	Nonce     string
-	Signature string
-	Body      []byte
+	MerchantID string
+	OrderID    string
+	Tp         MerchantNotifyTp
+	Timestamp  string
+	Nonce      string
+	Signature  string
+	Secret     string
+	Body       []byte
 }
 
 func (n *NotifyReq) Verify() bool {
-	mac := hmac.New(sha256.New, []byte(n.Merchant.Secret))
+	if strings.TrimSpace(n.Secret) == "" || strings.TrimSpace(n.Timestamp) == "" || strings.TrimSpace(n.Nonce) == "" || strings.TrimSpace(n.Signature) == "" {
+		return false
+	}
+	timestamp, err := strconv.ParseInt(strings.TrimSpace(n.Timestamp), 10, 64)
+	if err != nil {
+		return false
+	}
+	now := time.Now()
+	notifyAt := time.Unix(timestamp, 0)
+	if notifyAt.Before(now.Add(-notifyMaxClockSkew)) || notifyAt.After(now.Add(notifyMaxClockSkew)) {
+		return false
+	}
+
+	mac := hmac.New(sha256.New, []byte(n.Secret))
 	mac.Write([]byte(n.Timestamp))
 	mac.Write([]byte("\n"))
 	mac.Write([]byte(n.Nonce))
 	mac.Write([]byte("\n"))
+	mac.Write([]byte(strconv.Itoa(int(n.Tp))))
+	mac.Write([]byte("\n"))
+	mac.Write([]byte(n.OrderID))
+	mac.Write([]byte("\n"))
 	mac.Write(n.Body)
-	expected := hex.EncodeToString(mac.Sum(nil))
-	return hmac.Equal([]byte(strings.TrimSpace(n.Signature)), []byte(expected))
+	got, err := hex.DecodeString(strings.TrimSpace(n.Signature))
+	if err != nil {
+		return false
+	}
+	return hmac.Equal(got, mac.Sum(nil))
 }
 
 func (n *NotifyReq) ToNotifyResp() (*NotifyResp, error) {
 
 	out := &NotifyResp{
-		MerchantID: n.Merchant.ID,
+		MerchantID: n.MerchantID,
 		Tp:         n.Tp,
 	}
 
@@ -90,36 +121,81 @@ func (n *NotifyReq) ToNotifyResp() (*NotifyResp, error) {
 }
 
 type Notify struct {
-	Merchant
 	Header http.Header
 	Body   []byte
 }
 
-func (n *Notify) Valid() error {
+func (n *Notify) Identity() (*NotifyIdentity, error) {
+	if n == nil {
+		return nil, errors.New("payment: notify is required")
+	}
 	mid := strings.TrimSpace(n.Header.Get(headerMerchantID))
 	if mid == "" {
-		return errors.New("payment: invalid notify merchant id")
+		return nil, errors.New("payment: invalid notify merchant id")
 	}
-	if mid != n.Merchant.ID {
-		return errors.New("payment: merchant id in header not equal to merchant id")
+	orderID := strings.TrimSpace(n.Header.Get(headerOrderID))
+	if orderID == "" {
+		return nil, errors.New("payment: invalid notify order id")
 	}
-
-	return nil
+	notifyTp, err := strconv.Atoi(strings.TrimSpace(n.Header.Get(headerNotifyTp)))
+	if err != nil {
+		return nil, err
+	}
+	return &NotifyIdentity{
+		MerchantID: mid,
+		OrderID:    orderID,
+		Tp:         MerchantNotifyTp(notifyTp),
+	}, nil
 }
 
-func (n *Notify) ToNotifyReq() (*NotifyReq, error) {
-	notifyTp, err := strconv.Atoi(n.Header.Get(headerNotifyTp))
+func (n *Notify) ToNotifyReq(secret string) (*NotifyReq, error) {
+	identity, err := n.Identity()
 	if err != nil {
 		return nil, err
 	}
 	return &NotifyReq{
-		Merchant:  n.Merchant,
-		Tp:        MerchantNotifyTp(notifyTp),
-		Timestamp: n.Header.Get(headerTimestamp),
-		Nonce:     n.Header.Get(headerNonce),
-		Signature: n.Header.Get(headerSignature),
-		Body:      n.Body,
+		MerchantID: identity.MerchantID,
+		OrderID:    identity.OrderID,
+		Tp:         identity.Tp,
+		Timestamp:  n.Header.Get(headerTimestamp),
+		Nonce:      n.Header.Get(headerNonce),
+		Signature:  n.Header.Get(headerSignature),
+		Secret:     secret,
+		Body:       n.Body,
 	}, nil
+}
+
+func (n *NotifyReq) ValidatePayloadOrderID(resp *NotifyResp) error {
+	if resp == nil {
+		return errors.New("payment: notify response is required")
+	}
+	var payloadOrderID string
+	switch n.Tp {
+	case MerchantNotifyTpPayIn:
+		if resp.PayinOrder != nil {
+			payloadOrderID = resp.PayinOrder.OrderID
+		}
+	case MerchantNotifyTpPayOut:
+		if resp.PayoutOrder != nil {
+			payloadOrderID = resp.PayoutOrder.OrderID
+		}
+	case MerchantNotifyTpPayInRefund:
+		if resp.RefundOrder != nil {
+			payloadOrderID = resp.RefundOrder.OrderID
+		}
+	case MerchantNotifyTpPayInDispute:
+		if resp.DisputeOrder != nil {
+			payloadOrderID = resp.DisputeOrder.OrderID
+		}
+	case MerchantNotifyTpPayInAgreement:
+		if resp.AgreementOrder != nil {
+			payloadOrderID = resp.AgreementOrder.OrderID
+		}
+	}
+	if payloadOrderID != "" && payloadOrderID != n.OrderID {
+		return errors.New("payment: order id in header not equal to order id in body")
+	}
+	return nil
 }
 
 type NotifyOrderStatus uint8

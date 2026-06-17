@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -39,7 +40,7 @@ func (c *ClientImpl) GetPayin(ctx context.Context, req *GetPayinReq) (*PayinOrde
 	}
 
 	var out PayinOrderResp
-	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payin/order/%s", req.OrderID), nil, &out); err != nil {
+	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payin/order/%s", url.PathEscape(req.OrderID)), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -50,7 +51,7 @@ func (c *ClientImpl) RefundPayin(ctx context.Context, req RefundPayinReq) error 
 		return err
 	}
 
-	return c.doJSON(ctx, req.Merchant, http.MethodPost, fmt.Sprintf("/api/payin/order/%s/refund", req.OrderID), req, nil)
+	return c.doJSON(ctx, req.Merchant, http.MethodPost, fmt.Sprintf("/api/payin/order/%s/refund", url.PathEscape(req.OrderID)), req, nil)
 }
 
 func (c *ClientImpl) CreatePayout(ctx context.Context, req *CreatePayoutReq) (*CreatePayoutResp, error) {
@@ -71,7 +72,7 @@ func (c *ClientImpl) GetPayout(ctx context.Context, req *GetPayoutReq) (*PayoutO
 	}
 
 	var out PayoutOrderResp
-	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payout/order/%s", req.OrderID), nil, &out); err != nil {
+	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payout/order/%s", url.PathEscape(req.OrderID)), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -206,21 +207,32 @@ func (c *ClientImpl) signRequest(secret string, in signRequestInput) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-func (c *ClientImpl) ParseNotify(ctx context.Context, notify *Notify) (*NotifyResp, error) {
+func (c *ClientImpl) GetNotifyIdentity(notify *Notify) (*NotifyIdentity, error) {
 	if notify == nil {
 		return nil, errors.New("payment: notify is required")
 	}
-	if err := notify.Valid(); err != nil {
-		return nil, err
+	return notify.Identity()
+}
+
+func (c *ClientImpl) ParseNotify(ctx context.Context, secret string, notify *Notify) (*NotifyResp, error) {
+	if notify == nil {
+		return nil, errors.New("payment: notify is required")
 	}
-	req, err := notify.ToNotifyReq()
+	req, err := notify.ToNotifyReq(secret)
 	if err != nil {
 		return nil, err
 	}
 	if ok := req.Verify(); !ok {
 		return nil, errors.New("payment: verify notify request failed")
 	}
-	return req.ToNotifyResp()
+	resp, err := req.ToNotifyResp()
+	if err != nil {
+		return nil, err
+	}
+	if err := req.ValidatePayloadOrderID(resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (c *ClientImpl) NotifySuccess(w http.ResponseWriter) {

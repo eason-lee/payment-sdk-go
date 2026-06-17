@@ -180,16 +180,25 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := payment.NewClient(payment.Production())
-	merchant := payment.Merchant{
-		ID:     "1001",
-		Secret: "merchant-secret",
+
+	notify := &payment.Notify{
+		Header: r.Header,
+		Body:   body,
 	}
 
-	event, err := client.ParseNotify(r.Context(), &payment.Notify{
-		Merchant: merchant,
-		Header:   r.Header,
-		Body:     body,
-	})
+	identity, err := client.GetNotifyIdentity(notify)
+	if err != nil {
+		client.NotifyFailed(w)
+		return
+	}
+
+	secret, err := loadMerchantSecret(r.Context(), identity.MerchantID, identity.OrderID)
+	if err != nil {
+		client.NotifyFailed(w)
+		return
+	}
+
+	event, err := client.ParseNotify(r.Context(), secret, notify)
 	if err != nil {
 		client.NotifyFailed(w)
 		return

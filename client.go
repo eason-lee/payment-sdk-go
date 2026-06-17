@@ -15,8 +15,10 @@ type Client interface {
 	GetPayout(ctx context.Context, req *GetPayoutReq) (*PayoutOrderResp, error)
 	NotifyClient
 }
+
 type NotifyClient interface {
-	ParseNotify(ctx context.Context, notify *Notify) (*NotifyResp, error)
+	GetNotifyIdentity(notify *Notify) (*NotifyIdentity, error)
+	ParseNotify(ctx context.Context, secret string, notify *Notify) (*NotifyResp, error)
 	NotifySuccess(w http.ResponseWriter)
 	NotifyFailed(w http.ResponseWriter)
 }
@@ -55,7 +57,7 @@ func NewClient(env EnvType) *ClientImpl {
 
 type Merchant struct {
 	ID     string `json:"id" validate:"gt=0"`
-	Secret string `json:"secret" validate:"required"`
+	Secret string `json:"-" validate:"required"`
 }
 
 type CreatePayinReq struct {
