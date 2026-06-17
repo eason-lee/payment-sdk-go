@@ -21,7 +21,7 @@ type ClientImpl struct {
 	httpClient *http.Client
 }
 
-func (c *ClientImpl) CreatePayin(ctx context.Context, req CreatePayinReq) (*CreatePayinResp, error) {
+func (c *ClientImpl) CreatePayin(ctx context.Context, req *CreatePayinReq) (*CreatePayinResp, error) {
 	if err := req.Valid(); err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func (c *ClientImpl) CreatePayin(ctx context.Context, req CreatePayinReq) (*Crea
 	return &out, nil
 }
 
-func (c *ClientImpl) GetPayin(ctx context.Context, req GetPayinReq) (*PayinOrderResp, error) {
+func (c *ClientImpl) GetPayin(ctx context.Context, req *GetPayinReq) (*PayinOrderResp, error) {
 	if err := req.Valid(); err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (c *ClientImpl) RefundPayin(ctx context.Context, req RefundPayinReq) error 
 	return c.doJSON(ctx, req.Merchant, http.MethodPost, fmt.Sprintf("/api/payin/order/%s/refund", req.OrderID), req, nil)
 }
 
-func (c *ClientImpl) CreatePayout(ctx context.Context, req CreatePayoutReq) (*CreatePayoutResp, error) {
+func (c *ClientImpl) CreatePayout(ctx context.Context, req *CreatePayoutReq) (*CreatePayoutResp, error) {
 	if err := req.Valid(); err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (c *ClientImpl) CreatePayout(ctx context.Context, req CreatePayoutReq) (*Cr
 	return &out, nil
 }
 
-func (c *ClientImpl) GetPayout(ctx context.Context, req GetPayoutReq) (*PayoutOrderResp, error) {
+func (c *ClientImpl) GetPayout(ctx context.Context, req *GetPayoutReq) (*PayoutOrderResp, error) {
 	if err := req.Valid(); err != nil {
 		return nil, err
 	}

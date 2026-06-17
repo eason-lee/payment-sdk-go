@@ -33,7 +33,7 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 	defer server.Close()
 
 	client := testClient(server.URL)
-	resp, err := client.CreatePayin(context.Background(), CreatePayinReq{
+	resp, err := client.CreatePayin(context.Background(), &CreatePayinReq{
 		Merchant:        testMerchant,
 		MerchantOrderID: "M-2001",
 		Amount:          100,
@@ -61,7 +61,7 @@ func TestGetPayinDecodesMerchantOrderStatus(t *testing.T) {
 	defer server.Close()
 
 	client := testClient(server.URL)
-	resp, err := client.GetPayin(context.Background(), GetPayinReq{
+	resp, err := client.GetPayin(context.Background(), &GetPayinReq{
 		Merchant: testMerchant,
 		OrderID:  "2001",
 	})
@@ -92,7 +92,7 @@ func TestGetPayoutDecodesMerchantOrderStatus(t *testing.T) {
 	defer server.Close()
 
 	client := testClient(server.URL)
-	resp, err := client.GetPayout(context.Background(), GetPayoutReq{
+	resp, err := client.GetPayout(context.Background(), &GetPayoutReq{
 		Merchant: testMerchant,
 		OrderID:  "3001",
 	})

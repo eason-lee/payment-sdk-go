@@ -15,7 +15,7 @@ func main() {
 		Secret: "xxxx",
 	}
 
-	resp, err := client.CreatePayin(context.Background(), payment.CreatePayinReq{
+	resp, err := client.CreatePayin(context.Background(), &payment.CreatePayinReq{
 		Merchant:        merchant,
 		MerchantOrderID: "PAYIN-202606090001",
 		Amount:          10000,

@@ -15,7 +15,7 @@ func main() {
 		Secret: "xxxx",
 	}
 
-	resp, err := client.CreatePayout(context.Background(), payment.CreatePayoutReq{
+	resp, err := client.CreatePayout(context.Background(), &payment.CreatePayoutReq{
 		Merchant:        merchant,
 		MerchantOrderID: "PAYOUT-202606090001",
 		Amount:          50000,
