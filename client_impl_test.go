@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-var testMerchant = Merchant{ID: 1001, Secret: "merchant-secret"}
+var testMerchant = Merchant{ID: "1001", Secret: "merchant-secret"}
 
 func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -28,7 +28,7 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 		if got := r.Header.Get(headerTimestamp); got == "" || strings.Contains(got, "T") {
 			t.Fatalf("timestamp must be unix seconds, got %q", got)
 		}
-		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":2001,"link":"https://pay.example/2001"}}`))
+		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2001","link":"https://pay.example/2001"}}`))
 	}))
 	defer server.Close()
 
@@ -51,13 +51,13 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.OrderID != 2001 {
-		t.Fatalf("order id = %d", resp.OrderID)
+	if resp.OrderID != "2001" {
+		t.Fatalf("order id = %s", resp.OrderID)
 	}
 }
 
 func TestParseNotifyVerifiesAndDecodesPayinPayload(t *testing.T) {
-	body := []byte(`{"orderId":2001,"merchantOrderId":"M-2001","status":1,"fee":100}`)
+	body := []byte(`{"orderId":"2001","merchantOrderId":"M-2001","status":1,"fee":100}`)
 	header := signedNotifyHeader(testMerchant, MerchantNotifyTpPayIn, body)
 
 	resp, err := NewClient(EnvProduction).ParseNotify(context.Background(), &Notify{
@@ -71,13 +71,13 @@ func TestParseNotifyVerifiesAndDecodesPayinPayload(t *testing.T) {
 	if resp.Tp != MerchantNotifyTpPayIn {
 		t.Fatalf("notify type = %d", resp.Tp)
 	}
-	if resp.PayinOrder == nil || resp.PayinOrder.OrderID != 2001 || resp.PayinOrder.MerchantOrderId != "M-2001" {
+	if resp.PayinOrder == nil || resp.PayinOrder.OrderID != "2001" || resp.PayinOrder.MerchantOrderId != "M-2001" {
 		t.Fatalf("payload = %+v", resp.PayinOrder)
 	}
 }
 
 func TestParseNotifyRejectsBadSignature(t *testing.T) {
-	body := []byte(`{"orderId":2001,"merchantOrderId":"M-2001","status":1,"fee":100}`)
+	body := []byte(`{"orderId":"2001","merchantOrderId":"M-2001","status":1,"fee":100}`)
 	header := signedNotifyHeader(testMerchant, MerchantNotifyTpPayIn, body)
 	header.Set(headerSignature, "bad")
 
@@ -107,7 +107,7 @@ func signGatewayRequest(secret, method, path, timestamp, nonce string, body []by
 
 func signedNotifyHeader(merchant Merchant, tp MerchantNotifyTp, body []byte) http.Header {
 	header := http.Header{}
-	header.Set(headerMerchantID, "1001")
+	header.Set(headerMerchantID, merchant.ID)
 	header.Set(headerTimestamp, "1736214000")
 	header.Set(headerNonce, "nonce-abc")
 	header.Set(headerNotifyTp, strconv.Itoa(int(tp)))

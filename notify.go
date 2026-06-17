@@ -12,13 +12,13 @@ import (
 )
 
 type NotifyResp struct {
-	MerchantID     int64                     `json:"merchant_id"`
-	Tp             MerchantNotifyTp          `json:"tp"`
-	PayinOrder     *NotifyOrderPayload       `json:"payin_order,omitempty"`
-	RefundOrder    *NotifyRefundOrderPayload `json:"refund_order,omitempty"`
-	DisputeOrder   *NotifyDisputePayload     `json:"dispute_order,omitempty"`
-	PayoutOrder    *NotifyOrderPayload       `json:"payout_order,omitempty"`
-	AgreementOrder *NotifyAgreementPayload   `json:"agreement_order,omitempty"`
+	MerchantID     string                    `json:"merchant_id"`               // 商户ID
+	Tp             MerchantNotifyTp          `json:"tp"`                        // 通知类型
+	PayinOrder     *NotifyOrderPayload       `json:"payin_order,omitempty"`     // 支付订单通知
+	RefundOrder    *NotifyRefundOrderPayload `json:"refund_order,omitempty"`    // 退款订单通知
+	DisputeOrder   *NotifyDisputePayload     `json:"dispute_order,omitempty"`   // 争议订单通知
+	PayoutOrder    *NotifyOrderPayload       `json:"payout_order,omitempty"`    // 提现订单通知
+	AgreementOrder *NotifyAgreementPayload   `json:"agreement_order,omitempty"` // 协议订单通知
 }
 
 type NotifyReq struct {
@@ -96,8 +96,8 @@ type Notify struct {
 }
 
 func (n *Notify) Valid() error {
-	mid, err := strconv.ParseInt(strings.TrimSpace(n.Header.Get(headerMerchantID)), 10, 64)
-	if err != nil {
+	mid := strings.TrimSpace(n.Header.Get(headerMerchantID))
+	if mid == "" {
 		return errors.New("payment: invalid notify merchant id")
 	}
 	if mid != n.Merchant.ID {
@@ -129,12 +129,13 @@ const (
 	NotifyOrderStatusFailed
 )
 
+// NotifyOrderPayload 支付订单通知负载
 type NotifyOrderPayload struct {
-	OrderID         int64             `json:"orderId"`
-	MerchantOrderId string            `json:"merchantOrderId"`
-	Status          NotifyOrderStatus `json:"status"`
-	Fee             Money             `json:"fee"`
-	FailReason      string            `json:"failReason,omitempty"`
+	OrderID         string            `json:"orderId"`              // 订单ID
+	MerchantOrderId string            `json:"merchantOrderId"`      // 商户订单ID
+	Status          NotifyOrderStatus `json:"status"`               // 订单状态
+	Fee             Money             `json:"fee"`                  // 手续费
+	FailReason      string            `json:"failReason,omitempty"` // 失败原因
 }
 
 // RefundStatus 退款状态。
@@ -148,9 +149,9 @@ const (
 )
 
 type NotifyRefundOrderPayload struct {
-	OrderID         int64        `json:"orderId"`
+	OrderID         string       `json:"orderId"`
 	MerchantOrderId string       `json:"merchantOrderId"`
-	RefundOrderId   int64        `json:"refundOrderId"`
+	RefundOrderId   string       `json:"refundOrderId"`
 	Status          RefundStatus `json:"status"`
 	FailReason      string       `json:"failReason,omitempty"`
 }
@@ -165,9 +166,9 @@ const (
 )
 
 type NotifyDisputePayload struct {
-	OrderID         int64         `json:"orderId"`
+	OrderID         string        `json:"orderId"`
 	MerchantOrderId string        `json:"merchantOrderId"`
-	DisputeOrderId  int64         `json:"disputeOrderId"`
+	DisputeOrderId  string        `json:"disputeOrderId"`
 	Amount          Money         `json:"amount"`
 	Status          DisputeStatus `json:"status"`
 }
@@ -180,10 +181,10 @@ const (
 )
 
 type NotifyAgreementPayload struct {
-	OrderID         int64                 `json:"orderId"`
-	MerchantOrderId string                `json:"merchantOrderId"`
-	AgreementID     int64                 `json:"agreementId"`
-	Email           string                `json:"email"`
-	UserID          string                `json:"userId"`
-	Status          NotifyAgreementStatus `json:"status"`
+	OrderID         string                `json:"orderId"`         // 订单ID
+	MerchantOrderId string                `json:"merchantOrderId"` // 商户订单ID
+	AgreementID     string                `json:"agreementId"`     // 同意ID
+	Email           string                `json:"email"`           // 用户邮箱
+	UserID          string                `json:"userId"`          // 用户ID
+	Status          NotifyAgreementStatus `json:"status"`          // 同意状态
 }

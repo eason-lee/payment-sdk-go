@@ -39,7 +39,7 @@ func (c *ClientImpl) GetPayin(ctx context.Context, req GetPayinReq) (*PayinOrder
 	}
 
 	var out PayinOrderResp
-	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payin/order/%d", req.OrderID), nil, &out); err != nil {
+	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payin/order/%s", req.OrderID), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -50,7 +50,7 @@ func (c *ClientImpl) RefundPayin(ctx context.Context, req RefundPayinReq) error 
 		return err
 	}
 
-	return c.doJSON(ctx, req.Merchant, http.MethodPost, fmt.Sprintf("/api/payin/order/%d/refund", req.OrderID), req, nil)
+	return c.doJSON(ctx, req.Merchant, http.MethodPost, fmt.Sprintf("/api/payin/order/%s/refund", req.OrderID), req, nil)
 }
 
 func (c *ClientImpl) CreatePayout(ctx context.Context, req CreatePayoutReq) (*CreatePayoutResp, error) {
@@ -71,7 +71,7 @@ func (c *ClientImpl) GetPayout(ctx context.Context, req GetPayoutReq) (*PayoutOr
 	}
 
 	var out PayoutOrderResp
-	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payout/order/%d", req.OrderID), nil, &out); err != nil {
+	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payout/order/%s", req.OrderID), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -79,7 +79,7 @@ func (c *ClientImpl) GetPayout(ctx context.Context, req GetPayoutReq) (*PayoutOr
 
 func (c *ClientImpl) doJSON(ctx context.Context, merchant Merchant, method string, path string, body any, out any) error {
 	merchantID := merchant.ID
-	if merchantID <= 0 {
+	if strings.TrimSpace(merchantID) == "" {
 		return errors.New("payment: merchant id is required")
 	}
 	if strings.TrimSpace(merchant.Secret) == "" {
@@ -117,7 +117,7 @@ func (c *ClientImpl) doJSON(ctx context.Context, merchant Merchant, method strin
 		Body:      rawBody,
 	})
 
-	req.Header.Set(headerMerchantID, fmt.Sprintf("%d", merchantID))
+	req.Header.Set(headerMerchantID, merchantID)
 	req.Header.Set(headerTimestamp, timestamp)
 	req.Header.Set(headerNonce, nonce)
 	req.Header.Set(headerSignature, signature)

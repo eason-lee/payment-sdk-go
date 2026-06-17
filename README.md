@@ -31,7 +31,7 @@ client := payment.NewClient(payment.Sandbox())
 
 ```go
 merchant := payment.Merchant{
-	ID:     1001,
+	ID:     "1001",
 	Secret: "merchant-secret",
 }
 ```
@@ -78,7 +78,7 @@ fmt.Println(resp.Link)
 ```go
 payin, err := client.GetPayin(ctx, payment.GetPayinReq{
 	Merchant: merchant,
-	OrderID:  10201312003,
+	OrderID:  "10201312003",
 })
 if err != nil {
 	return err
@@ -90,7 +90,7 @@ if err != nil {
 ```go
 err := client.RefundPayin(ctx, payment.RefundPayinReq{
 	Merchant: merchant,
-	OrderID:  10201312003,
+	OrderID:  "10201312003",
 	Amount:   10000,
 })
 if err != nil {
@@ -125,7 +125,6 @@ if err != nil {
 
 ```go
 fmt.Println(resp.OrderID)
-fmt.Println(resp.ChannelOrderID)
 ```
 
 ## 查询代付订单
@@ -133,7 +132,7 @@ fmt.Println(resp.ChannelOrderID)
 ```go
 payout, err := client.GetPayout(ctx, payment.GetPayoutReq{
 	Merchant: merchant,
-	OrderID:  10201312010,
+	OrderID:  "10201312010",
 })
 if err != nil {
 	return err
@@ -154,7 +153,7 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 
 	client := payment.NewClient(payment.Production())
 	merchant := payment.Merchant{
-		ID:     1001,
+		ID:     "1001",
 		Secret: "merchant-secret",
 	}
 

@@ -11,7 +11,7 @@ import (
 
 func main() {
 	merchant := payment.Merchant{
-		ID:     1001,
+		ID:     "1001",
 		Secret: os.Getenv("PAYMENT_SECRET"),
 	}
 	http.HandleFunc("/payment/notify", func(w http.ResponseWriter, r *http.Request) {

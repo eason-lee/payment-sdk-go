@@ -11,7 +11,7 @@ import (
 func main() {
 	client := payment.NewClient(payment.Production())
 	merchant := payment.Merchant{
-		ID:     1001,
+		ID:     "1001",
 		Secret: "xxxx",
 	}
 
@@ -31,5 +31,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("order_id=%d link=%s\n", resp.OrderID, resp.Link)
+	fmt.Printf("order_id=%s link=%s\n", resp.OrderID, resp.Link)
 }
