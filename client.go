@@ -3,6 +3,7 @@ package payment
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -41,11 +42,15 @@ func (r GetPayoutReq) Valid() error {
 }
 
 func NewClient(env EnvType) *ClientImpl {
+	return NewClientWithBaseURL(env.GetBaseURL())
+}
+
+func NewClientWithBaseURL(baseURL string) *ClientImpl {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 
 	return &ClientImpl{
-		baseURL: env.GetBaseURL(),
+		baseURL: strings.TrimRight(baseURL, "/"),
 		httpClient: &http.Client{
 			Transport: transport,
 			Timeout:   15 * time.Second,

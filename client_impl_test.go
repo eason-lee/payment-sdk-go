@@ -51,6 +51,14 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 	}
 }
 
+func TestNewClientWithBaseURLTrimsTrailingSlash(t *testing.T) {
+	client := NewClientWithBaseURL("https://pay.example/")
+
+	if client.baseURL != "https://pay.example" {
+		t.Fatalf("baseURL = %q", client.baseURL)
+	}
+}
+
 func TestGetPayinDecodesMerchantOrderStatus(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/payin/order/2001" {
