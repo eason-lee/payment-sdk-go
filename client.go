@@ -80,11 +80,11 @@ func (r CreatePayinReq) Valid() error {
 }
 
 type User struct {
-	ID      string `json:"id" validate:"required"` // 用户ID
+	ID      string `json:"id" validate:"required"`       // 用户ID
 	AppName string `json:"app_name" validate:"required"` // 应用名称
-	Name    string `json:"name,omitempty"`             // 用户姓名
-	Email   string `json:"email,omitempty"`            // 用户邮箱
-	Phone   string `json:"phone,omitempty"`            // 用户手机号
+	Name    string `json:"name,omitempty"`               // 用户姓名
+	Email   string `json:"email,omitempty"`              // 用户邮箱
+	Phone   string `json:"phone,omitempty"`              // 用户手机号
 }
 
 type PayPal struct {
@@ -120,15 +120,14 @@ type CreatePayinResp struct {
 }
 
 type PayinOrderResp struct {
-	OrderID         string `json:"order_id"`
-	MerchantOrderID string `json:"merchant_order_id"`
-	Status          string `json:"status"`
-	Channel         string `json:"channel,omitempty"`
-	FailReason      string `json:"fail_reason,omitempty"`
-	Amount          int64  `json:"amount"`
-	RefundedAmount  int64  `json:"refunded_amount,omitempty"`
-	Currency        string `json:"currency"`
-	Method          string `json:"method"`
+	OrderID         string           `json:"order_id"`
+	MerchantOrderID string           `json:"merchant_order_id"`
+	Status          PayinOrderStatus `json:"status"`
+	FailReason      string           `json:"fail_reason,omitempty"`
+	Amount          int64            `json:"amount"`
+	RefundedAmount  int64            `json:"refunded_amount,omitempty"`
+	Currency        CurrencyTp       `json:"currency"`
+	PayMethod       PayMethod        `json:"pay_method"`
 }
 
 type RefundPayinReq struct {
@@ -161,14 +160,11 @@ type CreatePayoutResp struct {
 }
 
 type PayoutOrderResp struct {
-	OrderID         string `json:"order_id"`             // 订单ID
-	MerchantOrderID string `json:"merchant_order_id"`    // 商户订单ID
-	Status          string `json:"status"`               // 提现状态
-	PayMethod       string `json:"pay_method,omitempty"` // 支付方式
-	ReferenceNo     string `json:"reference_no,omitempty"`
-	InvoiceNo       string `json:"invoice_no,omitempty"`
-	FailReason      string `json:"fail_reason,omitempty"`
-	Amount          int64  `json:"amount"`
-	Currency        string `json:"currency"`
-	AppName         string `json:"app_name,omitempty"`
+	OrderID         string            `json:"order_id"`          // 订单ID
+	MerchantOrderID string            `json:"merchant_order_id"` // 商户订单ID
+	Status          PayoutOrderStatus `json:"status"`            // 代付订单状态
+	PayMethod       PayMethod         `json:"pay_method,omitempty"`
+	FailReason      string            `json:"fail_reason,omitempty"`
+	Amount          int64             `json:"amount"`
+	Currency        CurrencyTp        `json:"currency"`
 }

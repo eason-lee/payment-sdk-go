@@ -5,7 +5,7 @@ Payment 商户网关 Go SDK，用于第三方商户服务端接入代收、代�
 ## 安装
 
 ```bash
-go get github.com/eason-lee/payment-sdk-go@v0.1.1
+go get github.com/eason-lee/payment-sdk-go@v0.1.2
 ```
 
 ## 创建客户端
@@ -83,7 +83,23 @@ payin, err := client.GetPayin(ctx, payment.GetPayinReq{
 if err != nil {
 	return err
 }
+if payin.Status == payment.PayinOrderStatusProcessing {
+	// 处理中，请等待通知或继续查询。
+}
 ```
+
+代收订单状态：
+
+| 常量 | 值 | 说明 |
+|---|---:|---|
+| `PayinOrderStatusUnspecified` | `0` | 未知状态 |
+| `PayinOrderStatusProcessing` | `1` | 处理中 |
+| `PayinOrderStatusSuccess` | `2` | 支付成功 |
+| `PayinOrderStatusFailed` | `3` | 支付失败 |
+| `PayinOrderStatusRefunding` | `4` | 退款中 |
+| `PayinOrderStatusRefunded` | `5` | 已退款 |
+| `PayinOrderStatusRefundFailed` | `6` | 退款失败或被拒绝 |
+| `PayinOrderStatusCanceled` | `7` | 已取消 |
 
 ## 代收退款
 
@@ -137,7 +153,19 @@ payout, err := client.GetPayout(ctx, payment.GetPayoutReq{
 if err != nil {
 	return err
 }
+if payout.Status == payment.PayoutOrderStatusProcessing {
+	// 处理中，请等待通知或继续查询。
+}
 ```
+
+代付订单状态：
+
+| 常量 | 值 | 说明 |
+|---|---:|---|
+| `PayoutOrderStatusUnspecified` | `0` | 未知状态 |
+| `PayoutOrderStatusProcessing` | `1` | 处理中 |
+| `PayoutOrderStatusSuccess` | `2` | 代付成功 |
+| `PayoutOrderStatusFailed` | `3` | 代付失败 |
 
 ## 接收商户通知
 

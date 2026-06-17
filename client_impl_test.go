@@ -32,12 +32,7 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 	}))
 	defer server.Close()
 
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.Proxy = nil
-	client := &ClientImpl{
-		baseURL:    server.URL,
-		httpClient: &http.Client{Transport: transport},
-	}
+	client := testClient(server.URL)
 	resp, err := client.CreatePayin(context.Background(), CreatePayinReq{
 		Merchant:        testMerchant,
 		MerchantOrderID: "M-2001",
@@ -53,6 +48,65 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 	}
 	if resp.OrderID != "2001" {
 		t.Fatalf("order id = %s", resp.OrderID)
+	}
+}
+
+func TestGetPayinDecodesMerchantOrderStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/payin/order/2001" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2001","merchant_order_id":"M-2001","status":1,"amount":100,"refunded_amount":0,"currency":"USD","pay_method":"PayPal"}}`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL)
+	resp, err := client.GetPayin(context.Background(), GetPayinReq{
+		Merchant: testMerchant,
+		OrderID:  "2001",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Status != PayinOrderStatusProcessing {
+		t.Fatalf("status = %d", resp.Status)
+	}
+	if resp.OrderID != "2001" || resp.MerchantOrderID != "M-2001" {
+		t.Fatalf("resp = %+v", resp)
+	}
+	if resp.PayMethod != PayMethodPayPal {
+		t.Fatalf("pay method = %s", resp.PayMethod)
+	}
+	if resp.Currency != CurrencyTpUSD {
+		t.Fatalf("currency = %s", resp.Currency)
+	}
+}
+
+func TestGetPayoutDecodesMerchantOrderStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/payout/order/3001" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"3001","merchant_order_id":"P-3001","status":2,"pay_method":"PayPal","amount":100,"currency":"USD"}}`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL)
+	resp, err := client.GetPayout(context.Background(), GetPayoutReq{
+		Merchant: testMerchant,
+		OrderID:  "3001",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Status != PayoutOrderStatusSuccess {
+		t.Fatalf("status = %d", resp.Status)
+	}
+	if resp.OrderID != "3001" || resp.MerchantOrderID != "P-3001" {
+		t.Fatalf("resp = %+v", resp)
+	}
+	if resp.Currency != CurrencyTpUSD {
+		t.Fatalf("currency = %s", resp.Currency)
 	}
 }
 
@@ -88,6 +142,15 @@ func TestParseNotifyRejectsBadSignature(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected signature error")
+	}
+}
+
+func testClient(baseURL string) *ClientImpl {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	return &ClientImpl{
+		baseURL:    baseURL,
+		httpClient: &http.Client{Transport: transport},
 	}
 }
 

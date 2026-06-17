@@ -96,6 +96,42 @@ const (
 	MerchantNotifyTpPayInAgreement MerchantNotifyTp = 5
 )
 
+// PayinOrderStatus 是商户侧可见的代收订单状态。
+type PayinOrderStatus int
+
+const (
+	// PayinOrderStatusUnspecified 表示未知代收订单状态，正常业务不应依赖该状态。
+	PayinOrderStatusUnspecified PayinOrderStatus = iota
+	// PayinOrderStatusProcessing 表示代收订单处理中，请等待通知或继续查询。
+	PayinOrderStatusProcessing
+	// PayinOrderStatusSuccess 表示代收订单支付成功。
+	PayinOrderStatusSuccess
+	// PayinOrderStatusFailed 表示代收订单支付失败。
+	PayinOrderStatusFailed
+	// PayinOrderStatusRefunding 表示代收订单退款处理中。
+	PayinOrderStatusRefunding
+	// PayinOrderStatusRefunded 表示代收订单已退款。
+	PayinOrderStatusRefunded
+	// PayinOrderStatusRefundFailed 表示代收订单退款失败或被拒绝。
+	PayinOrderStatusRefundFailed
+	// PayinOrderStatusCanceled 表示代收订单已取消。
+	PayinOrderStatusCanceled
+)
+
+// PayoutOrderStatus 是商户侧可见的代付订单状态。
+type PayoutOrderStatus int
+
+const (
+	// PayoutOrderStatusUnspecified 表示未知代付订单状态，正常业务不应依赖该状态。
+	PayoutOrderStatusUnspecified PayoutOrderStatus = iota
+	// PayoutOrderStatusProcessing 表示代付订单处理中，请等待通知或继续查询。
+	PayoutOrderStatusProcessing
+	// PayoutOrderStatusSuccess 表示代付订单代付成功。
+	PayoutOrderStatusSuccess
+	// PayoutOrderStatusFailed 表示代付订单代付失败。
+	PayoutOrderStatusFailed
+)
+
 // Money 金额，单位为分
 type Money int64
 
