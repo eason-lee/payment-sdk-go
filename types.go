@@ -52,8 +52,9 @@ const (
 )
 
 const (
-	productionBaseURL = "http://192.168.1.171" // TODO 生产环境地址待确认
-	sandboxBaseURL    = "http://192.168.160.191" // TODO 沙箱环境
+	productionBaseURL = "http://192.168.1.171"   // TODO 生产环境地址待确认
+	sandboxBaseURL    = "http://192.168.160.191" // TODO 沙箱环境地址待确认
+	testBaseURL       = "http://127.0.0.1:8083"
 )
 
 type EnvType string
@@ -61,6 +62,7 @@ type EnvType string
 const (
 	EnvProduction EnvType = "production"
 	EnvSandbox    EnvType = "sandbox"
+	EnvTest       EnvType = "test"
 )
 
 // Production returns production merchant gateway environment.
@@ -70,6 +72,8 @@ func (p EnvType) GetBaseURL() string {
 		return productionBaseURL
 	case EnvSandbox:
 		return sandboxBaseURL
+	case EnvTest:
+		return testBaseURL
 	default:
 		return ""
 	}
