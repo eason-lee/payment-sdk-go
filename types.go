@@ -15,7 +15,9 @@ const (
 type PayMethod string
 
 const (
-	PayMethodPayPal PayMethod = "PayPal"
+	PayMethodPayPal    PayMethod = "PayPal"
+	PayMethodApplePay  PayMethod = "ApplePay"
+	PayMethodGooglePay PayMethod = "GooglePay"
 )
 
 // PayMode 表示同一支付方式下的具体使用形态。
