@@ -62,16 +62,18 @@ type Merchant struct {
 
 type CreatePayinReq struct {
 	Merchant
-	MerchantOrderID string      `json:"merchant_order_id" validate:"required"`                 // 商户订单ID
-	Amount          int64       `json:"amount" validate:"gt=0"`                                // 金额, 单位分
-	Currency        CurrencyTp  `json:"currency" validate:"oneof=USD"`                         // 货币类型
-	PayMethod       PayMethod   `json:"pay_method" validate:"oneof=PayPal ApplePay GooglePay"` // 支付方式
-	PayMode         PayMode     `json:"pay_mode" validate:"required"`                          // 支付模式
-	User            *User       `json:"user,omitempty"`                                        // 用户信息
-	PayPal          *PayPal     `json:"paypal,omitempty"`                                      // PayPal支付信息
-	ApplePay        *ApplePay   `json:"apple_pay,omitempty"`                                   // ApplePay支付信息
-	CreditCard      *CreditCard `json:"credit_card,omitempty"`                                 // 信用卡支付信息
-	GooglePay       *GooglePay  `json:"google_pay,omitempty"`                                  // GooglePay支付信息
+	MerchantOrderID string      `json:"merchant_order_id" validate:"required"`                            // 商户订单ID
+	Amount          int64       `json:"amount" validate:"gt=0"`                                           // 金额, 单位分
+	Currency        CurrencyTp  `json:"currency" validate:"oneof=USD"`                                    // 货币类型
+	Country         string      `json:"country,omitempty"`                                                // 支付国家，Checkout 必填
+	PayMethod       PayMethod   `json:"pay_method" validate:"oneof=PayPal ApplePay GooglePay CreditCard"` // 支付方式
+	PayMode         PayMode     `json:"pay_mode" validate:"required"`                                     // 支付模式
+	User            *User       `json:"user,omitempty"`                                                   // 用户信息
+	PayPal          *PayPal     `json:"paypal,omitempty"`                                                 // PayPal支付信息
+	Checkout        *Checkout   `json:"checkout,omitempty"`                                               // Checkout统一支付信息
+	ApplePay        *ApplePay   `json:"apple_pay,omitempty"`                                              // ApplePay支付信息，兼容旧字段
+	CreditCard      *CreditCard `json:"credit_card,omitempty"`                                            // 信用卡支付信息，兼容旧字段
+	GooglePay       *GooglePay  `json:"google_pay,omitempty"`                                             // GooglePay支付信息，兼容旧字段
 }
 
 func (r CreatePayinReq) Valid() error {
@@ -110,6 +112,17 @@ type CreditCard struct {
 	State       string `json:"state,omitempty"`
 }
 
+type Checkout struct {
+	SourceID    string     `json:"source_id,omitempty"`
+	CreditToken string     `json:"credit_token,omitempty"`
+	AppleToken  string     `json:"apple_token,omitempty"`
+	Address     string     `json:"address,omitempty"`
+	ZipCode     string     `json:"zip_code,omitempty"`
+	State       string     `json:"state,omitempty"`
+	City        string     `json:"city,omitempty"`
+	GooglePay   *GooglePay `json:"google_pay,omitempty"`
+}
+
 type GooglePay struct {
 	Signature       string `json:"signature,omitempty"`
 	SignedMessage   string `json:"signed_message,omitempty"`
@@ -117,8 +130,15 @@ type GooglePay struct {
 }
 
 type CreatePayinResp struct {
-	OrderID string `json:"order_id"`
-	Link    string `json:"link"`
+	OrderID        string                  `json:"order_id"`
+	Link           string                  `json:"link"`
+	PaymentSession *CheckoutPaymentSession `json:"payment_session,omitempty"`
+}
+
+type CheckoutPaymentSession struct {
+	ID     string `json:"id"`
+	Token  string `json:"token"`
+	Secret string `json:"secret"`
 }
 
 type PayinOrderResp struct {

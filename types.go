@@ -15,9 +15,10 @@ const (
 type PayMethod string
 
 const (
-	PayMethodPayPal    PayMethod = "PayPal"
-	PayMethodApplePay  PayMethod = "ApplePay"
-	PayMethodGooglePay PayMethod = "GooglePay"
+	PayMethodPayPal     PayMethod = "PayPal"
+	PayMethodApplePay   PayMethod = "ApplePay"
+	PayMethodGooglePay  PayMethod = "GooglePay"
+	PayMethodCreditCard PayMethod = "CreditCard"
 )
 
 // PayMode 表示同一支付方式下的具体使用形态。
@@ -26,6 +27,7 @@ type PayMode string
 const (
 	PayModeCreditToken     PayMode = "CreditToken"     // 原生信用卡
 	PayModeCreditSourceID  PayMode = "CreditSourceId"  // sourceId 信用卡绑卡支付
+	PayModeCreditFlow      PayMode = "CreditFlow"      // Checkout Flow 信用卡
 	PayModePayPal          PayMode = "PayPal"          // 直接拉起的
 	PayModePayPalAgreement PayMode = "PayPalAgreement" // 授权绑定唯一ID的
 	PayModeApplePayNative  PayMode = "ApplePayNative"  // 原生 applePay
@@ -37,7 +39,7 @@ const (
 
 func (p PayMode) Valid() error {
 	switch p {
-	case PayModeCreditToken, PayModeCreditSourceID, PayModePayPal, PayModePayPalAgreement, PayModeApplePayNative, PayModeApplePayWeb, PayModeGooglePayWeb, PayModeCashAppWeb, PayModeSkrillWeb:
+	case PayModeCreditToken, PayModeCreditSourceID, PayModeCreditFlow, PayModePayPal, PayModePayPalAgreement, PayModeApplePayNative, PayModeApplePayWeb, PayModeGooglePayWeb, PayModeCashAppWeb, PayModeSkrillWeb:
 		return nil
 	default:
 		return errors.New("payment: invalid pay mode")

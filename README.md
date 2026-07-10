@@ -73,6 +73,44 @@ fmt.Println(resp.Link)
 
 如果 `resp.Link` 不为空，商户可以把用户跳转到该链接完成支付。
 
+### Checkout 信用卡 Payment Session
+
+Checkout 信用卡 Flow 使用 `PayMethodCreditCard` + `PayModeCreditFlow` 创建订单。商户服务端创建订单后，把返回的 `PaymentSession` 交给前端 Checkout SDK 完成卡信息采集和 3DS 流程。
+
+```go
+resp, err := client.CreatePayin(ctx, payment.CreatePayinReq{
+	Merchant:        merchant,
+	MerchantOrderID: "PAYIN-202606090002",
+	Amount:          10000,
+	Currency:        payment.CurrencyTpUSD,
+	Country:         "US",
+	PayMethod:       payment.PayMethodCreditCard,
+	PayMode:         payment.PayModeCreditFlow,
+	User: &payment.User{
+		ID:      "u_1001",
+		AppName: "DemoApp",
+		Name:    "John Doe",
+		Email:   "john@example.com",
+	},
+	Checkout: &payment.Checkout{
+		Address: "100 Main St",
+		ZipCode: "10001",
+		State:   "NY",
+		City:    "New York",
+	},
+})
+if err != nil {
+	return err
+}
+if resp.PaymentSession == nil {
+	return errors.New("checkout payment session is empty")
+}
+fmt.Println(resp.OrderID)
+fmt.Println(resp.PaymentSession.ID)
+fmt.Println(resp.PaymentSession.Token)
+fmt.Println(resp.PaymentSession.Secret)
+```
+
 ## 查询代收订单
 
 ```go

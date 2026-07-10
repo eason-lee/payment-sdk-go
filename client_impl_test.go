@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -52,6 +53,76 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 	}
 	if resp.OrderID != "2001" {
 		t.Fatalf("order id = %s", resp.OrderID)
+	}
+}
+
+func TestCreatePayinCheckoutCreditFlowRequestAndResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), body)
+		if got := r.Header.Get(headerSignature); got != want {
+			t.Fatalf("signature mismatch\nwant: %s\n got: %s", want, got)
+		}
+
+		var payload map[string]any
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload["pay_method"] != string(PayMethodCreditCard) {
+			t.Fatalf("pay_method = %v", payload["pay_method"])
+		}
+		if payload["pay_mode"] != string(PayModeCreditFlow) {
+			t.Fatalf("pay_mode = %v", payload["pay_mode"])
+		}
+		if payload["country"] != "US" {
+			t.Fatalf("country = %v", payload["country"])
+		}
+		checkout := payload["checkout"].(map[string]any)
+		if checkout["address"] != "100 Main St" || checkout["zip_code"] != "10001" {
+			t.Fatalf("checkout = %#v", checkout)
+		}
+		if checkout["state"] != "NY" || checkout["city"] != "New York" {
+			t.Fatalf("checkout = %#v", checkout)
+		}
+		if _, ok := payload["credit_card"]; ok {
+			t.Fatalf("request should use unified checkout, got credit_card in %s", body)
+		}
+
+		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2002","payment_session":{"id":"ps_2002","token":"pst_2002","secret":"pss_2002"}}}`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL)
+	resp, err := client.CreatePayin(context.Background(), &CreatePayinReq{
+		Merchant:        testMerchant,
+		MerchantOrderID: "M-2002",
+		Amount:          1000,
+		Currency:        CurrencyTpUSD,
+		Country:         "US",
+		PayMethod:       PayMethodCreditCard,
+		PayMode:         PayModeCreditFlow,
+		User:            &User{ID: "u_1001", AppName: "DemoApp"},
+		Checkout: &Checkout{
+			Address: "100 Main St",
+			ZipCode: "10001",
+			State:   "NY",
+			City:    "New York",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.OrderID != "2002" {
+		t.Fatalf("order id = %s", resp.OrderID)
+	}
+	if resp.PaymentSession == nil {
+		t.Fatal("payment session is nil")
+	}
+	if resp.PaymentSession.ID != "ps_2002" || resp.PaymentSession.Token != "pst_2002" || resp.PaymentSession.Secret != "pss_2002" {
+		t.Fatalf("payment session = %#v", resp.PaymentSession)
 	}
 }
 
