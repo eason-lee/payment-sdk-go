@@ -40,7 +40,7 @@ func (c *ClientImpl) GetPayin(ctx context.Context, req *GetPayinReq) (*PayinOrde
 	}
 
 	var out PayinOrderResp
-	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payin/order/%s", url.PathEscape(req.OrderID)), nil, &out); err != nil {
+	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payin/order/s/%s", url.PathEscape(req.OrderID)), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -51,7 +51,7 @@ func (c *ClientImpl) RefundPayin(ctx context.Context, req RefundPayinReq) error 
 		return err
 	}
 
-	return c.doJSON(ctx, req.Merchant, http.MethodPost, fmt.Sprintf("/api/payin/order/%s/refund", url.PathEscape(req.OrderID)), req, nil)
+	return c.doJSON(ctx, req.Merchant, http.MethodPost, fmt.Sprintf("/api/payin/order/s/%s/refund", url.PathEscape(req.OrderID)), req, nil)
 }
 
 func (c *ClientImpl) CreatePayout(ctx context.Context, req *CreatePayoutReq) (*CreatePayoutResp, error) {
@@ -72,7 +72,7 @@ func (c *ClientImpl) GetPayout(ctx context.Context, req *GetPayoutReq) (*PayoutO
 	}
 
 	var out PayoutOrderResp
-	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payout/order/%s", url.PathEscape(req.OrderID)), nil, &out); err != nil {
+	if err := c.doJSON(ctx, req.Merchant, http.MethodGet, fmt.Sprintf("/api/payout/order/s/%s", url.PathEscape(req.OrderID)), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

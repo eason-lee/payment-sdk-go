@@ -128,7 +128,7 @@ func TestCreatePayinCheckoutCreditFlowRequestAndResponse(t *testing.T) {
 
 func TestGetPayinEscapesStringOrderIDInPath(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.EscapedPath() != "/api/payin/order/order%2F2001" {
+		if r.URL.EscapedPath() != "/api/payin/order/s/order%2F2001" {
 			t.Fatalf("escaped path = %s", r.URL.EscapedPath())
 		}
 		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"order/2001","merchant_order_id":"M-2001","status":1,"amount":100,"refunded_amount":0,"currency":"USD","pay_method":"PayPal"}}`))
@@ -147,7 +147,7 @@ func TestGetPayinEscapesStringOrderIDInPath(t *testing.T) {
 
 func TestGetPayinDecodesMerchantOrderStatus(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/payin/order/2001" {
+		if r.URL.Path != "/api/payin/order/s/2001" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
 		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2001","merchant_order_id":"M-2001","status":1,"amount":100,"refunded_amount":0,"currency":"USD","pay_method":"PayPal"}}`))
@@ -178,7 +178,7 @@ func TestGetPayinDecodesMerchantOrderStatus(t *testing.T) {
 
 func TestGetPayoutDecodesMerchantOrderStatus(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/payout/order/3001" {
+		if r.URL.Path != "/api/payout/order/s/3001" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
 		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"3001","merchant_order_id":"P-3001","status":2,"pay_method":"PayPal","amount":100,"currency":"USD"}}`))
