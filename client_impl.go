@@ -34,6 +34,30 @@ func (c *ClientImpl) CreatePayin(ctx context.Context, req *CreatePayinReq) (*Cre
 	return &out, nil
 }
 
+func (c *ClientImpl) SubmitCreditFlow(ctx context.Context, req *SubmitCreditFlowReq) (*SubmitCreditFlowResp, error) {
+	if err := req.Valid(); err != nil {
+		return nil, err
+	}
+
+	path := fmt.Sprintf("/api/payin/order/s/%s/checkout/submit", url.PathEscape(req.OrderID))
+	// body 不含 order_id / merchant 密钥；merchant 只用于签名头。
+	body := struct {
+		SessionID   string            `json:"session_id"`
+		SessionData string            `json:"session_data"`
+		Card        *CardRiskSnapshot `json:"card"`
+	}{
+		SessionID:   strings.TrimSpace(req.SessionID),
+		SessionData: req.SessionData,
+		Card:        req.Card,
+	}
+
+	var out SubmitCreditFlowResp
+	if err := c.doJSON(ctx, req.Merchant, http.MethodPost, path, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *ClientImpl) GetPayin(ctx context.Context, req *GetPayinReq) (*PayinOrderResp, error) {
 	if err := req.Valid(); err != nil {
 		return nil, err

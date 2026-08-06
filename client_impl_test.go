@@ -46,6 +46,7 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 		PayMethod:       PayMethodPayPal,
 		PayMode:         PayModePayPalAgreement,
 		User:            &User{ID: "u_1001", AppName: "DemoApp"},
+		Address:         &Address{Country: "US", Address: "100 Main St", State: "NY", City: "New York", Zip: "10001"},
 		PayPal:          &PayPal{Email: "buyer@example.com"},
 	})
 	if err != nil {
@@ -105,6 +106,7 @@ func TestCreatePayinCheckoutCreditFlowRequestAndResponse(t *testing.T) {
 		PayMethod:       PayMethodCreditCard,
 		PayMode:         PayModeCreditFlow,
 		User:            &User{ID: "u_1001", AppName: "DemoApp"},
+		Address:         &Address{Country: "US", Address: "100 Main St", State: "NY", City: "New York", Zip: "10001"},
 		Checkout: &Checkout{
 			Address: "100 Main St",
 			ZipCode: "10001",
