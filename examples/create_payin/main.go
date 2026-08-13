@@ -26,7 +26,8 @@ func main() {
 			ID:      "u_1001",
 			AppName: "DemoApp",
 		},
-		PayPal: &payment.PayPal{Email: "buyer@example.com"},
+		Address: &payment.Address{Country: "US"},
+		PayPal:  &payment.PayPal{Email: "buyer@example.com"},
 	})
 	if err != nil {
 		log.Fatal(err)

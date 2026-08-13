@@ -5,7 +5,7 @@ Payment 商户网关 Go SDK，用于第三方商户服务端接入代收、代�
 ## 安装
 
 ```bash
-go get github.com/eason-lee/payment-sdk-go@v0.1.3
+go get github.com/eason-lee/payment-sdk-go@v0.1.8
 ```
 
 ## 创建客户端
@@ -55,6 +55,9 @@ resp, err := client.CreatePayin(ctx, payment.CreatePayinReq{
 		Email:   "john@example.com",
 		Phone:   "+10000000000",
 	},
+	Address: &payment.Address{
+		Country: "US",
+	},
 	PayPal: &payment.PayPal{
 		Email: "buyer@example.com",
 	},
@@ -83,7 +86,6 @@ resp, err := client.CreatePayin(ctx, payment.CreatePayinReq{
 	MerchantOrderID: "PAYIN-202606090002",
 	Amount:          10000,
 	Currency:        payment.CurrencyTpUSD,
-	Country:         "US",
 	PayMethod:       payment.PayMethodCreditCard,
 	PayMode:         payment.PayModeCreditFlow,
 	User: &payment.User{
@@ -92,11 +94,12 @@ resp, err := client.CreatePayin(ctx, payment.CreatePayinReq{
 		Name:    "John Doe",
 		Email:   "john@example.com",
 	},
-	Checkout: &payment.Checkout{
+	Address: &payment.Address{
+		Country: "US",
 		Address: "100 Main St",
-		ZipCode: "10001",
 		State:   "NY",
 		City:    "New York",
+		Zip:     "10001",
 	},
 })
 if err != nil {
@@ -111,6 +114,33 @@ fmt.Println(resp.PaymentSession.Token)
 fmt.Println(resp.PaymentSession.Secret)
 ```
 
+### 原生信用卡 Token
+
+`PayModeCreditToken` 使用 `credit_card.token`，不要再传 `credit_token` 或 `checkout`。地址走顶层 `address`。
+
+```go
+resp, err := client.CreatePayin(ctx, payment.CreatePayinReq{
+	Merchant:        merchant,
+	MerchantOrderID: "PAYIN-202606090003",
+	Amount:          10000,
+	Currency:        payment.CurrencyTpUSD,
+	PayMethod:       payment.PayMethodCreditCard,
+	PayMode:         payment.PayModeCreditToken,
+	Address: &payment.Address{
+		Country: "US",
+	},
+	CreditCard: &payment.CreditCard{
+		Token:       "tok_xxx",
+		CardName:    "John Doe",
+		Last4:       "4242",
+		ExpiryMonth: "12",
+		ExpiryYear:  "2030",
+	},
+})
+```
+
+CreditFlow 第二阶段提交时，卡片快照字段与网关一致：`card_name`、`bin`、`last4`、`expiry_month`、`expiry_year`、`scheme`、`country`。
+
 ## 查询代收订单
 
 ```go
@@ -124,6 +154,12 @@ if err != nil {
 if payin.Status == payment.PayinOrderStatusProcessing {
 	// 处理中，请等待通知或继续查询。
 }
+if payin.HasRefund && payin.Refund != nil {
+	// 关联退款见 payin.Refund
+}
+if payin.Dispute != nil {
+	// 关联争议见 payin.Dispute
+}
 ```
 
 代收订单状态：
@@ -136,8 +172,7 @@ if payin.Status == payment.PayinOrderStatusProcessing {
 | `PayinOrderStatusFailed` | `3` | 支付失败 |
 | `PayinOrderStatusRefunding` | `4` | 退款中 |
 | `PayinOrderStatusRefunded` | `5` | 已退款 |
-| `PayinOrderStatusRefundFailed` | `6` | 退款失败或被拒绝 |
-| `PayinOrderStatusCanceled` | `7` | 已取消 |
+| `PayinOrderStatusCanceled` | `6` | 已取消 |
 
 ## 代收退款
 

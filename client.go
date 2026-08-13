@@ -66,90 +66,90 @@ type Merchant struct {
 
 type CreatePayinReq struct {
 	Merchant
-	MerchantOrderID string      `json:"merchant_order_id" validate:"required"`                            // 商户订单ID
-	Amount          int64       `json:"amount" validate:"gt=0"`                                           // 金额, 单位分
-	Currency        CurrencyTp  `json:"currency" validate:"oneof=USD"`                                    // 货币类型
-	Country         string      `json:"country,omitempty"`                                                // 兼容旧字段；支付国以 Address.Country 为准
-	PayMethod       PayMethod   `json:"pay_method" validate:"oneof=PayPal ApplePay GooglePay CreditCard"` // 支付方式
-	PayMode         PayMode     `json:"pay_mode" validate:"required"`                                     // 支付模式
-	User            *User       `json:"user,omitempty"`                                                   // 用户信息
-	Address         *Address    `json:"address" validate:"required"`                                      // 账单/支付地址；支付国放 Country
-	PayPal          *PayPal     `json:"paypal,omitempty"`                                                 // PayPal支付信息
-	Checkout        *Checkout   `json:"checkout,omitempty"`                                               // Checkout统一支付信息
-	ApplePay        *ApplePay   `json:"apple_pay,omitempty"`                                              // ApplePay支付信息，兼容旧字段
-	CreditCard      *CreditCard `json:"credit_card,omitempty"`                                            // 信用卡支付信息，兼容旧字段
-	GooglePay       *GooglePay  `json:"google_pay,omitempty"`                                             // GooglePay支付信息，兼容旧字段
+	MerchantOrderID string      `json:"merchant_order_id" validate:"required,max=64"`                                    // 商户订单ID
+	Amount          int64       `json:"amount" validate:"gt=0"`                                                          // 金额, 单位分
+	Currency        CurrencyTp  `json:"currency" validate:"oneof=USD EUR GBP"`                                           // 货币类型
+	PayMethod       PayMethod   `json:"pay_method" validate:"oneof=PayPal ApplePay GooglePay CreditCard CashApp Skrill"` // 支付方式
+	PayMode         PayMode     `json:"pay_mode" validate:"required"`                                                    // 支付模式
+	User            *User       `json:"user,omitempty"`                                                                  // 用户信息
+	Address         *Address    `json:"address" validate:"required"`                                                     // 账单/支付地址；支付国放 Country
+	PayPal          *PayPal     `json:"paypal,omitempty"`                                                                // PayPal 支付信息
+	CreditCard      *CreditCard `json:"credit_card,omitempty"`                                                           // 信用卡凭证；CreditToken/CreditSourceId 必填
+	ApplePay        *ApplePay   `json:"apple_pay,omitempty"`                                                             // ApplePay 支付信息
+	GooglePay       *GooglePay  `json:"google_pay,omitempty"`                                                            // GooglePay 支付信息
 }
 
 // Address 账单/支付地址。支付国使用 Country。
 type Address struct {
 	Country string `json:"country,omitempty"`
-	Address string `json:"address,omitempty"`
-	State   string `json:"state,omitempty"`
-	City    string `json:"city,omitempty"`
-	Zip     string `json:"zip,omitempty"`
+	Address string `json:"address,omitempty" validate:"omitempty,max=255"`
+	State   string `json:"state,omitempty" validate:"omitempty,max=64"`
+	City    string `json:"city,omitempty" validate:"omitempty,max=64"`
+	Zip     string `json:"zip,omitempty" validate:"omitempty,max=32"`
 }
 
 func (r CreatePayinReq) Valid() error {
-	if err := r.PayMode.Valid(); err != nil {
+	if err := ValidStruct(r); err != nil {
 		return err
 	}
-	return ValidStruct(r)
+	if err := r.PayMode.Valid(r.PayMethod); err != nil {
+		return err
+	}
+	if r.PayMode == PayModeCreditFlow {
+		if r.Address.State == "" || r.Address.City == "" {
+			return errors.New("address.state and address.city are required")
+		}
+	}
+	switch r.PayMode {
+	case PayModeCreditToken:
+		if r.CreditCard == nil || r.CreditCard.Token == "" {
+			return errors.New("credit_card.token is required")
+		}
+	case PayModeCreditSourceID:
+		if r.CreditCard == nil || r.CreditCard.SourceID == "" {
+			return errors.New("credit_card.source_id is required")
+		}
+	}
+	return nil
 }
 
 type User struct {
-	ID      string `json:"id" validate:"required"`       // 用户ID
-	AppName string `json:"app_name" validate:"required"` // 应用名称
-	Name    string `json:"name,omitempty"`               // 用户姓名
-	Email   string `json:"email,omitempty"`              // 用户邮箱
-	Phone   string `json:"phone,omitempty"`              // 用户手机号
+	ID      string `json:"id" validate:"required"`              // 用户ID
+	AppName string `json:"app_name" validate:"required,max=50"` // 应用名称
+	Name    string `json:"name,omitempty"`                      // 用户姓名
+	Email   string `json:"email,omitempty"`                     // 用户邮箱
+	Phone   string `json:"phone,omitempty"`                     // 用户手机号
 }
 
 type PayPal struct {
 	Email string `json:"email"` // PayPal邮箱
 }
 
+// ApplePay Apple Pay 支付方式参数。地址走顶层 address。
 type ApplePay struct {
 	AppleToken string `json:"apple_token,omitempty"` // ApplePay支付令牌
-	Country    string `json:"country,omitempty"`
-	City       string `json:"city,omitempty"`
-	State      string `json:"state,omitempty"`
 }
 
+// CreditCard 建单信用卡凭证。Token 路径可选传入 tokenize 回包中的卡面信息；地址走顶层 address。
 type CreditCard struct {
 	SourceID    string `json:"source_id,omitempty"`
-	CreditToken string `json:"credit_token,omitempty"`
-	Address     string `json:"address,omitempty"`
-	ZipCode     string `json:"zip_code,omitempty"`
-	Country     string `json:"country,omitempty"`
-	City        string `json:"city,omitempty"`
-	State       string `json:"state,omitempty"`
+	Token       string `json:"token,omitempty"`
+	CardName    string `json:"card_name,omitempty" validate:"omitempty,max=128"`
+	Last4       string `json:"last4,omitempty" validate:"omitempty,max=4"`
+	ExpiryMonth string `json:"expiry_month,omitempty" validate:"omitempty,max=2"`
+	ExpiryYear  string `json:"expiry_year,omitempty" validate:"omitempty,max=4"`
 }
 
 // CardRiskSnapshot 是非敏感卡片风险快照，用于 Forter 前置风控。
-// 禁止包含完整卡号（PAN）或 CVV。
+// 禁止包含完整卡号（PAN）或 CVV。字段名与 merchant CardRiskInfo 一致。
 type CardRiskSnapshot struct {
-	NameOnCard      string `json:"name_on_card,omitempty"`
-	Bin             string `json:"bin,omitempty"`
-	LastFourDigits  string `json:"last_four_digits,omitempty"`
-	ExpirationMonth string `json:"expiration_month,omitempty"`
-	ExpirationYear  string `json:"expiration_year,omitempty"`
-	Scheme          string `json:"scheme,omitempty"`
-	IssuerCountry   string `json:"issuer_country,omitempty"`
-}
-
-type Checkout struct {
-	SourceID    string            `json:"source_id,omitempty"`
-	CreditToken string            `json:"credit_token,omitempty"`
-	AppleToken  string            `json:"apple_token,omitempty"`
-	Address     string            `json:"address,omitempty"`
-	ZipCode     string            `json:"zip_code,omitempty"`
-	State       string            `json:"state,omitempty"`
-	City        string            `json:"city,omitempty"`
-	GooglePay   *GooglePay        `json:"google_pay,omitempty"`
-	// Card 是 CreditToken/CreditSourceId 建单时的非敏感卡片风险快照。
-	// CreditFlow 建单阶段可不传；第二阶段 submit 时在 SubmitCreditFlowReq.Card 中提交。
-	Card *CardRiskSnapshot `json:"card,omitempty"`
+	CardName    string `json:"card_name,omitempty"`
+	Bin         string `json:"bin,omitempty"`
+	Last4       string `json:"last4,omitempty"`
+	ExpiryMonth string `json:"expiry_month,omitempty"`
+	ExpiryYear  string `json:"expiry_year,omitempty"`
+	Scheme      string `json:"scheme,omitempty"`
+	Country     string `json:"country,omitempty"`
 }
 
 // SubmitCreditFlowReq 是 CreditFlow 第二阶段服务端提交请求。
@@ -206,9 +206,30 @@ type PayinOrderResp struct {
 	Status          PayinOrderStatus `json:"status"`
 	FailReason      string           `json:"fail_reason,omitempty"`
 	Amount          int64            `json:"amount"`
-	RefundedAmount  int64            `json:"refunded_amount,omitempty"`
+	HasRefund       bool             `json:"has_refund,omitempty"`
 	Currency        CurrencyTp       `json:"currency"`
-	PayMethod       PayMethod        `json:"pay_method"`
+	PayMethod       PayMethod        `json:"pay_method,omitempty"`
+	Refund          *PayinRefund     `json:"refund,omitempty"`
+	Dispute         *PayinDispute    `json:"dispute,omitempty"`
+}
+
+// PayinRefund 是查询代收订单时返回的关联退款。
+type PayinRefund struct {
+	RefundOrderID string `json:"refund_order_id"`
+	Status        int32  `json:"status"`
+	OutRefundID   string `json:"out_refund_id,omitempty"`
+	FailReason    string `json:"fail_reason,omitempty"`
+	Amount        int64  `json:"amount"`
+}
+
+// PayinDispute 是查询代收订单时返回的关联争议。
+type PayinDispute struct {
+	DisputeID    string     `json:"dispute_id"`
+	OutDisputeID string     `json:"out_dispute_id,omitempty"`
+	Status       int32      `json:"status"`
+	Reason       string     `json:"reason,omitempty"`
+	Amount       int64      `json:"amount"`
+	Currency     CurrencyTp `json:"currency,omitempty"`
 }
 
 type RefundPayinReq struct {
@@ -225,7 +246,7 @@ type CreatePayoutReq struct {
 	Merchant
 	MerchantOrderID string     `json:"merchant_order_id" validate:"required"` // 商户订单ID
 	Amount          int64      `json:"amount" validate:"gt=0"`                // 金额, 单位分
-	Currency        CurrencyTp `json:"currency" validate:"oneof=USD"`         // 货币类型
+	Currency        CurrencyTp `json:"currency" validate:"oneof=USD EUR GBP"` // 货币类型
 	PayMethod       PayMethod  `json:"pay_method" validate:"oneof=PayPal"`    // 支付方式
 	Account         string     `json:"account" validate:"required"`           // 支付账号
 	User            *User      `json:"user,omitempty"`                        // 用户信息

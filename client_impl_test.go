@@ -57,7 +57,7 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 	}
 }
 
-func TestCreatePayinCheckoutCreditFlowRequestAndResponse(t *testing.T) {
+func TestCreatePayinCreditFlowRequestAndResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -78,18 +78,21 @@ func TestCreatePayinCheckoutCreditFlowRequestAndResponse(t *testing.T) {
 		if payload["pay_mode"] != string(PayModeCreditFlow) {
 			t.Fatalf("pay_mode = %v", payload["pay_mode"])
 		}
-		if payload["country"] != "US" {
-			t.Fatalf("country = %v", payload["country"])
+		if _, ok := payload["country"]; ok {
+			t.Fatalf("request must not send top-level country: %s", body)
 		}
-		checkout := payload["checkout"].(map[string]any)
-		if checkout["address"] != "100 Main St" || checkout["zip_code"] != "10001" {
-			t.Fatalf("checkout = %#v", checkout)
+		if _, ok := payload["checkout"]; ok {
+			t.Fatalf("request must not send checkout: %s", body)
 		}
-		if checkout["state"] != "NY" || checkout["city"] != "New York" {
-			t.Fatalf("checkout = %#v", checkout)
+		addr, ok := payload["address"].(map[string]any)
+		if !ok {
+			t.Fatalf("address missing: %s", body)
 		}
-		if _, ok := payload["credit_card"]; ok {
-			t.Fatalf("request should use unified checkout, got credit_card in %s", body)
+		if addr["country"] != "US" || addr["address"] != "100 Main St" || addr["zip"] != "10001" {
+			t.Fatalf("address = %#v", addr)
+		}
+		if addr["state"] != "NY" || addr["city"] != "New York" {
+			t.Fatalf("address = %#v", addr)
 		}
 
 		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2002","payment_session":{"id":"ps_2002","token":"pst_2002","secret":"pss_2002"}}}`))
@@ -102,17 +105,10 @@ func TestCreatePayinCheckoutCreditFlowRequestAndResponse(t *testing.T) {
 		MerchantOrderID: "M-2002",
 		Amount:          1000,
 		Currency:        CurrencyTpUSD,
-		Country:         "US",
 		PayMethod:       PayMethodCreditCard,
 		PayMode:         PayModeCreditFlow,
 		User:            &User{ID: "u_1001", AppName: "DemoApp"},
 		Address:         &Address{Country: "US", Address: "100 Main St", State: "NY", City: "New York", Zip: "10001"},
-		Checkout: &Checkout{
-			Address: "100 Main St",
-			ZipCode: "10001",
-			State:   "NY",
-			City:    "New York",
-		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -128,12 +124,113 @@ func TestCreatePayinCheckoutCreditFlowRequestAndResponse(t *testing.T) {
 	}
 }
 
+func TestCreatePayinCreditTokenRequestUsesTokenField(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Fatal(err)
+		}
+		card, ok := payload["credit_card"].(map[string]any)
+		if !ok {
+			t.Fatalf("credit_card missing: %s", body)
+		}
+		if card["token"] != "tok_2003" {
+			t.Fatalf("credit_card.token = %v", card["token"])
+		}
+		if _, ok := card["credit_token"]; ok {
+			t.Fatalf("request must not send credit_token: %s", body)
+		}
+		if card["card_name"] != "John Doe" || card["last4"] != "4242" {
+			t.Fatalf("credit_card = %#v", card)
+		}
+		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2003"}}`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL)
+	resp, err := client.CreatePayin(context.Background(), &CreatePayinReq{
+		Merchant:        testMerchant,
+		MerchantOrderID: "M-2003",
+		Amount:          1000,
+		Currency:        CurrencyTpUSD,
+		PayMethod:       PayMethodCreditCard,
+		PayMode:         PayModeCreditToken,
+		Address:         &Address{Country: "US"},
+		CreditCard: &CreditCard{
+			Token:       "tok_2003",
+			CardName:    "John Doe",
+			Last4:       "4242",
+			ExpiryMonth: "12",
+			ExpiryYear:  "2030",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.OrderID != "2003" {
+		t.Fatalf("order id = %s", resp.OrderID)
+	}
+}
+
+func TestSubmitCreditFlowSendsCardRiskInfoFields(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/payin/order/s/2002/checkout/submit" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Fatal(err)
+		}
+		card, ok := payload["card"].(map[string]any)
+		if !ok {
+			t.Fatalf("card missing: %s", body)
+		}
+		if card["card_name"] != "John Doe" || card["last4"] != "4242" || card["country"] != "US" {
+			t.Fatalf("card = %#v", card)
+		}
+		if _, ok := card["name_on_card"]; ok {
+			t.Fatalf("request must not send name_on_card: %s", body)
+		}
+		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2002","status":"pending"}}`))
+	}))
+	defer server.Close()
+
+	client := testClient(server.URL)
+	resp, err := client.SubmitCreditFlow(context.Background(), &SubmitCreditFlowReq{
+		Merchant:    testMerchant,
+		OrderID:     "2002",
+		SessionID:   "ps_2002",
+		SessionData: "session-data",
+		Card: &CardRiskSnapshot{
+			CardName:    "John Doe",
+			Last4:       "4242",
+			ExpiryMonth: "12",
+			ExpiryYear:  "2030",
+			Country:     "US",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.OrderID != "2002" {
+		t.Fatalf("order id = %s", resp.OrderID)
+	}
+}
+
 func TestGetPayinEscapesStringOrderIDInPath(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.EscapedPath() != "/api/payin/order/s/order%2F2001" {
 			t.Fatalf("escaped path = %s", r.URL.EscapedPath())
 		}
-		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"order/2001","merchant_order_id":"M-2001","status":1,"amount":100,"refunded_amount":0,"currency":"USD","pay_method":"PayPal"}}`))
+		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"order/2001","merchant_order_id":"M-2001","status":1,"amount":100,"currency":"USD","pay_method":"PayPal"}}`))
 	}))
 	defer server.Close()
 
@@ -152,7 +249,7 @@ func TestGetPayinDecodesMerchantOrderStatus(t *testing.T) {
 		if r.URL.Path != "/api/payin/order/s/2001" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
-		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2001","merchant_order_id":"M-2001","status":1,"amount":100,"refunded_amount":0,"currency":"USD","pay_method":"PayPal"}}`))
+		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2001","merchant_order_id":"M-2001","status":1,"amount":100,"has_refund":true,"currency":"USD","pay_method":"PayPal","refund":{"refund_order_id":"8001","status":2,"out_refund_id":"ch-rf-1","amount":100}}}`))
 	}))
 	defer server.Close()
 
@@ -175,6 +272,9 @@ func TestGetPayinDecodesMerchantOrderStatus(t *testing.T) {
 	}
 	if resp.Currency != CurrencyTpUSD {
 		t.Fatalf("currency = %s", resp.Currency)
+	}
+	if !resp.HasRefund || resp.Refund == nil || resp.Refund.RefundOrderID != "8001" || resp.Refund.Amount != 100 {
+		t.Fatalf("refund = %#v has_refund=%v", resp.Refund, resp.HasRefund)
 	}
 }
 

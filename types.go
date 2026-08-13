@@ -19,6 +19,8 @@ const (
 	PayMethodApplePay   PayMethod = "ApplePay"
 	PayMethodGooglePay  PayMethod = "GooglePay"
 	PayMethodCreditCard PayMethod = "CreditCard"
+	PayMethodCashApp    PayMethod = "CashApp"
+	PayMethodSkrill     PayMethod = "Skrill"
 )
 
 // PayMode 表示同一支付方式下的具体使用形态。
@@ -37,13 +39,52 @@ const (
 	PayModeSkrillWeb       PayMode = "SkrillWeb"       // 外跳 skrill
 )
 
-func (p PayMode) Valid() error {
-	switch p {
-	case PayModeCreditToken, PayModeCreditSourceID, PayModeCreditFlow, PayModePayPal, PayModePayPalAgreement, PayModeApplePayNative, PayModeApplePayWeb, PayModeGooglePayWeb, PayModeCashAppWeb, PayModeSkrillWeb:
-		return nil
-	default:
+var payModeAllowed = map[PayMethod]map[PayMode]struct{}{
+	PayMethodPayPal: {
+		PayModePayPal:          {},
+		PayModePayPalAgreement: {},
+	},
+	PayMethodCreditCard: {
+		PayModeCreditToken:    {},
+		PayModeCreditSourceID: {},
+		PayModeCreditFlow:     {},
+	},
+	PayMethodApplePay: {
+		PayModeApplePayNative: {},
+		PayModeApplePayWeb:    {},
+	},
+	PayMethodGooglePay: {
+		PayModeGooglePayWeb: {},
+	},
+	PayMethodCashApp: {
+		PayModeCashAppWeb: {},
+	},
+	PayMethodSkrill: {
+		PayModeSkrillWeb: {},
+	},
+}
+
+var payModeErrMsg = map[PayMethod]string{
+	PayMethodPayPal:     "payment: paypal pay mode must be PayPal or PayPalAgreement",
+	PayMethodCreditCard: "payment: credit card pay mode must be CreditToken, CreditSourceId or CreditFlow",
+	PayMethodApplePay:   "payment: apple pay pay mode must be ApplePayNative or ApplePayWeb",
+	PayMethodGooglePay:  "payment: google pay pay mode must be GooglePayWeb",
+	PayMethodCashApp:    "payment: cash app pay mode must be CashAppWeb",
+	PayMethodSkrill:     "payment: skrill pay mode must be SkrillWeb",
+}
+
+func (p PayMode) Valid(payMethod PayMethod) error {
+	allowed, ok := payModeAllowed[payMethod]
+	if !ok {
+		return errors.New("payment: invalid pay method")
+	}
+	if _, ok := allowed[p]; !ok {
+		if msg, exists := payModeErrMsg[payMethod]; exists {
+			return errors.New(msg)
+		}
 		return errors.New("payment: invalid pay mode")
 	}
+	return nil
 }
 
 // CurrencyTp 货币类型
@@ -123,8 +164,6 @@ const (
 	PayinOrderStatusRefunding
 	// PayinOrderStatusRefunded 表示代收订单已退款。
 	PayinOrderStatusRefunded
-	// PayinOrderStatusRefundFailed 表示代收订单退款失败或被拒绝。
-	PayinOrderStatusRefundFailed
 	// PayinOrderStatusCanceled 表示代收订单已取消。
 	PayinOrderStatusCanceled
 )
