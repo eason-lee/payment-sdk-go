@@ -288,6 +288,10 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 		// 处理代收争议通知。
 	case payment.MerchantNotifyTpPayInAgreement:
 		// 处理代收协议签约通知。
+	case payment.MerchantNotifyTpPayInCardBind:
+		// 处理信用卡绑卡通知。
+	case payment.MerchantNotifyTpPayInFraud:
+		// 处理代收欺诈通知。
 	}
 
 	client.NotifySuccess(w)
@@ -296,13 +300,34 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 
 通知类型：
 
-| 类型 | 说明 |
-|---|---|
-| `MerchantNotifyTpPayIn` | 代收订单通知 |
-| `MerchantNotifyTpPayInRefund` | 代收退款通知 |
-| `MerchantNotifyTpPayInDispute` | 代收争议通知 |
-| `MerchantNotifyTpPayOut` | 代付订单通知 |
-| `MerchantNotifyTpPayInAgreement` | 代收协议签约通知 |
+| 类型 | 值 | 说明 |
+|---|---:|---|
+| `MerchantNotifyTpPayIn` | `1` | 代收订单通知 |
+| `MerchantNotifyTpPayInRefund` | `2` | 代收退款通知 |
+| `MerchantNotifyTpPayInDispute` | `3` | 代收争议通知 |
+| `MerchantNotifyTpPayOut` | `4` | 代付订单通知 |
+| `MerchantNotifyTpPayInAgreement` | `5` | 代收协议签约通知 |
+| `MerchantNotifyTpPayInCardBind` | `6` | 信用卡绑卡通知 |
+| `MerchantNotifyTpPayInFraud` | `7` | 代收欺诈通知 |
+
+退款通知 `RefundOrder.Status`：
+
+| 常量 | 值 | 说明 |
+|---|---:|---|
+| `RefundStatusPending` | `1` | 待处理 |
+| `RefundStatusSuccess` | `2` | 退款成功 |
+| `RefundStatusFailed` | `3` | 失败（含拒绝） |
+
+争议通知 `DisputeOrder.Status`：
+
+| 常量 | 值 | 说明 |
+|---|---:|---|
+| `DisputeStatusReceived` | `1` | 收到争议 |
+| `DisputeStatusWin` | `2` | 商户赢 |
+| `DisputeStatusLose` | `3` | 商户输 |
+| `DisputeStatusCanceled` | `4` | 争议取消 |
+
+当前 Payment 可能仍把欺诈折成类型 `1` 的失败订单通知。接入方应同时处理 `MerchantNotifyTpPayIn` 失败和 `MerchantNotifyTpPayInFraud`。
 
 `NotifySuccess` 会返回 HTTP 200，表示商户已经成功处理通知。
 

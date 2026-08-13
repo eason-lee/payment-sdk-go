@@ -22,6 +22,8 @@ type NotifyResp struct {
 	DisputeOrder   *NotifyDisputePayload     `json:"dispute_order,omitempty"`   // 争议订单通知
 	PayoutOrder    *NotifyOrderPayload       `json:"payout_order,omitempty"`    // 提现订单通知
 	AgreementOrder *NotifyAgreementPayload   `json:"agreement_order,omitempty"` // 协议订单通知
+	CardBind       *NotifyCardBindPayload    `json:"card_bind,omitempty"`       // 信用卡绑卡通知
+	FraudOrder     *NotifyFraudPayload       `json:"fraud_order,omitempty"`     // 欺诈通知
 }
 
 type NotifyIdentity struct {
@@ -114,6 +116,20 @@ func (n *NotifyReq) ToNotifyResp() (*NotifyResp, error) {
 			return nil, err
 		}
 		out.AgreementOrder = &payload
+	case MerchantNotifyTpPayInCardBind:
+		out.Tp = MerchantNotifyTpPayInCardBind
+		var payload NotifyCardBindPayload
+		if err := json.Unmarshal(n.Body, &payload); err != nil {
+			return nil, err
+		}
+		out.CardBind = &payload
+	case MerchantNotifyTpPayInFraud:
+		out.Tp = MerchantNotifyTpPayInFraud
+		var payload NotifyFraudPayload
+		if err := json.Unmarshal(n.Body, &payload); err != nil {
+			return nil, err
+		}
+		out.FraudOrder = &payload
 	default:
 		return nil, errors.New("payment: unknown notify type")
 	}
@@ -191,6 +207,14 @@ func (n *NotifyReq) ValidatePayloadOrderID(resp *NotifyResp) error {
 		if resp.AgreementOrder != nil {
 			payloadOrderID = resp.AgreementOrder.OrderID
 		}
+	case MerchantNotifyTpPayInCardBind:
+		if resp.CardBind != nil {
+			payloadOrderID = resp.CardBind.OrderID
+		}
+	case MerchantNotifyTpPayInFraud:
+		if resp.FraudOrder != nil {
+			payloadOrderID = resp.FraudOrder.OrderID
+		}
 	}
 	if payloadOrderID != "" && payloadOrderID != n.OrderID {
 		return errors.New("payment: order id in header not equal to order id in body")
@@ -218,10 +242,9 @@ type NotifyOrderPayload struct {
 type RefundStatus uint8
 
 const (
-	RefundStatusPending  RefundStatus = 1 // 待处理
-	RefundStatusSuccess  RefundStatus = 2 // 成功
-	RefundStatusDeclined RefundStatus = 3 // 拒绝
-	RefundStatusFailed   RefundStatus = 4 // 失败
+	RefundStatusPending RefundStatus = 1 // 待处理
+	RefundStatusSuccess RefundStatus = 2 // 成功
+	RefundStatusFailed  RefundStatus = 3 // 失败（含拒绝）
 )
 
 type NotifyRefundOrderPayload struct {
@@ -239,6 +262,7 @@ const (
 	DisputeStatusReceived DisputeStatus = 1 // 收到争议
 	DisputeStatusWin      DisputeStatus = 2 // 争议赢了
 	DisputeStatusLose     DisputeStatus = 3 // 争议输了
+	DisputeStatusCanceled DisputeStatus = 4 // 争议取消
 )
 
 type NotifyDisputePayload struct {
@@ -257,10 +281,34 @@ const (
 )
 
 type NotifyAgreementPayload struct {
-	OrderID         string                `json:"orderId"`         // 订单ID
-	MerchantOrderId string                `json:"merchantOrderId"` // 商户订单ID
-	AgreementID     string                `json:"agreementId"`     // 同意ID
-	Email           string                `json:"email"`           // 用户邮箱
-	UserID          string                `json:"userId"`          // 用户ID
-	Status          NotifyAgreementStatus `json:"status"`          // 同意状态
+	OrderID         string                `json:"orderId,omitempty"`         // 订单ID
+	MerchantOrderId string                `json:"merchantOrderId,omitempty"` // 商户订单ID
+	AgreementID     string                `json:"agreementId"`               // 协议ID
+	Email           string                `json:"email"`                     // 用户邮箱
+	UserID          string                `json:"userId"`                    // 用户ID
+	Status          NotifyAgreementStatus `json:"status"`                    // 协议状态
+}
+
+type NotifyCardBindPayload struct {
+	OrderID         string `json:"orderId"`
+	MerchantOrderId string `json:"merchantOrderId"`
+	UserID          string `json:"userId"`
+	SourceID        string `json:"sourceId"`
+	Last4           string `json:"last4,omitempty"`
+	Bin             string `json:"bin,omitempty"`
+	Scheme          string `json:"scheme,omitempty"`
+	CardName        string `json:"cardName,omitempty"`
+	ExpiryMonth     string `json:"expiryMonth,omitempty"`
+	ExpiryYear      string `json:"expiryYear,omitempty"`
+	Country         string `json:"country,omitempty"`
+	Fingerprint     string `json:"fingerprint,omitempty"`
+}
+
+type NotifyFraudPayload struct {
+	OrderID         string `json:"orderId"`
+	MerchantOrderId string `json:"merchantOrderId"`
+	UserID          string `json:"userId,omitempty"`
+	Reason          string `json:"reason,omitempty"`
+	Type            string `json:"type,omitempty"`
+	Eci             string `json:"eci,omitempty"`
 }

@@ -47,6 +47,16 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 		// Handle idempotently by event.PayinOrder.OrderID or MerchantOrderId.
 	case payment.MerchantNotifyTpPayOut:
 		// Handle idempotently by event.PayoutOrder.OrderID or MerchantOrderId.
+	case payment.MerchantNotifyTpPayInRefund:
+		// Handle refund by event.RefundOrder.RefundOrderId.
+	case payment.MerchantNotifyTpPayInDispute:
+		// Handle dispute by event.DisputeOrder.DisputeOrderId.
+	case payment.MerchantNotifyTpPayInAgreement:
+		// Handle agreement by event.AgreementOrder.AgreementID.
+	case payment.MerchantNotifyTpPayInCardBind:
+		// Handle card bind by event.CardBind.SourceID.
+	case payment.MerchantNotifyTpPayInFraud:
+		// Handle fraud by event.FraudOrder.OrderID.
 	}
 
 	client.NotifySuccess(w)

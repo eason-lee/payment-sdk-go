@@ -146,6 +146,10 @@ const (
 	MerchantNotifyTpPayOut MerchantNotifyTp = 4
 	// MerchantNotifyTpPayInAgreement 表示代收 PayPal 协议签约通知。
 	MerchantNotifyTpPayInAgreement MerchantNotifyTp = 5
+	// MerchantNotifyTpPayInCardBind 表示信用卡绑卡/可复用 instrument 通知。
+	MerchantNotifyTpPayInCardBind MerchantNotifyTp = 6
+	// MerchantNotifyTpPayInFraud 表示代收订单欺诈通知。
+	MerchantNotifyTpPayInFraud MerchantNotifyTp = 7
 )
 
 // PayinOrderStatus 是商户侧可见的代收订单状态。

@@ -376,6 +376,82 @@ func TestParseNotifyRejectsMismatchedHeaderOrderID(t *testing.T) {
 	}
 }
 
+func TestParseNotifyRefundFailedStatus(t *testing.T) {
+	body := []byte(`{"orderId":"2001","merchantOrderId":"M-2001","refundOrderId":"3001","status":3,"failReason":"declined"}`)
+	resp, err := NewClient(EnvProduction).ParseNotify(context.Background(), testMerchant.Secret, &Notify{
+		Header: signedNotifyHeader(testMerchant, MerchantNotifyTpPayInRefund, body),
+		Body:   body,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Tp != MerchantNotifyTpPayInRefund {
+		t.Fatalf("notify type = %d", resp.Tp)
+	}
+	if resp.RefundOrder == nil || resp.RefundOrder.Status != RefundStatusFailed || resp.RefundOrder.RefundOrderId != "3001" {
+		t.Fatalf("payload = %+v", resp.RefundOrder)
+	}
+}
+
+func TestParseNotifyDisputeCanceledStatus(t *testing.T) {
+	body := []byte(`{"orderId":"2001","merchantOrderId":"M-2001","disputeOrderId":"4001","amount":100,"status":4}`)
+	resp, err := NewClient(EnvProduction).ParseNotify(context.Background(), testMerchant.Secret, &Notify{
+		Header: signedNotifyHeader(testMerchant, MerchantNotifyTpPayInDispute, body),
+		Body:   body,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.DisputeOrder == nil || resp.DisputeOrder.Status != DisputeStatusCanceled || resp.DisputeOrder.DisputeOrderId != "4001" {
+		t.Fatalf("payload = %+v", resp.DisputeOrder)
+	}
+}
+
+func TestParseNotifyCardBind(t *testing.T) {
+	body := []byte(`{"orderId":"2001","merchantOrderId":"M-2001","userId":"u1","sourceId":"src_1","last4":"4242","bin":"424242"}`)
+	resp, err := NewClient(EnvProduction).ParseNotify(context.Background(), testMerchant.Secret, &Notify{
+		Header: signedNotifyHeader(testMerchant, MerchantNotifyTpPayInCardBind, body),
+		Body:   body,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Tp != MerchantNotifyTpPayInCardBind {
+		t.Fatalf("notify type = %d", resp.Tp)
+	}
+	if resp.CardBind == nil || resp.CardBind.SourceID != "src_1" || resp.CardBind.Last4 != "4242" || resp.CardBind.UserID != "u1" {
+		t.Fatalf("payload = %+v", resp.CardBind)
+	}
+}
+
+func TestParseNotifyFraud(t *testing.T) {
+	body := []byte(`{"orderId":"2001","merchantOrderId":"M-2001","userId":"u1","reason":"stolen","type":"fraud","eci":"05"}`)
+	resp, err := NewClient(EnvProduction).ParseNotify(context.Background(), testMerchant.Secret, &Notify{
+		Header: signedNotifyHeader(testMerchant, MerchantNotifyTpPayInFraud, body),
+		Body:   body,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Tp != MerchantNotifyTpPayInFraud {
+		t.Fatalf("notify type = %d", resp.Tp)
+	}
+	if resp.FraudOrder == nil || resp.FraudOrder.Reason != "stolen" || resp.FraudOrder.Eci != "05" {
+		t.Fatalf("payload = %+v", resp.FraudOrder)
+	}
+}
+
+func TestParseNotifyRejectsUnknownType(t *testing.T) {
+	body := []byte(`{"orderId":"2001"}`)
+	_, err := NewClient(EnvProduction).ParseNotify(context.Background(), testMerchant.Secret, &Notify{
+		Header: signedNotifyHeader(testMerchant, MerchantNotifyTp(99), body),
+		Body:   body,
+	})
+	if err == nil {
+		t.Fatal("expected unknown notify type error")
+	}
+}
+
 func testClient(baseURL string) *ClientImpl {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil

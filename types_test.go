@@ -61,3 +61,18 @@ func TestPayinOrderStatusCanceledValue(t *testing.T) {
 		t.Fatalf("PayinOrderStatusCanceled = %d, want 6", PayinOrderStatusCanceled)
 	}
 }
+
+func TestNotifyContractValues(t *testing.T) {
+	if MerchantNotifyTpPayInCardBind != 6 {
+		t.Fatalf("MerchantNotifyTpPayInCardBind = %d, want 6", MerchantNotifyTpPayInCardBind)
+	}
+	if MerchantNotifyTpPayInFraud != 7 {
+		t.Fatalf("MerchantNotifyTpPayInFraud = %d, want 7", MerchantNotifyTpPayInFraud)
+	}
+	if RefundStatusFailed != 3 {
+		t.Fatalf("RefundStatusFailed = %d, want 3", RefundStatusFailed)
+	}
+	if DisputeStatusCanceled != 4 {
+		t.Fatalf("DisputeStatusCanceled = %d, want 4", DisputeStatusCanceled)
+	}
+}
