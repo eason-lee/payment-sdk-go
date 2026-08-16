@@ -78,6 +78,23 @@ func (c *ClientImpl) RefundPayin(ctx context.Context, req RefundPayinReq) error 
 	return c.doJSON(ctx, req.Merchant, http.MethodPost, fmt.Sprintf("/api/payin/order/s/%s/refund", url.PathEscape(req.OrderID)), req, nil)
 }
 
+func (c *ClientImpl) AppealDispute(ctx context.Context, req *AppealDisputeReq) error {
+	if req == nil {
+		return errors.New("payment: appeal request is required")
+	}
+	if err := req.Valid(); err != nil {
+		return err
+	}
+	body := struct {
+		FileURL string `json:"file_url"`
+		Notes   string `json:"notes,omitempty"`
+	}{
+		FileURL: req.FileURL,
+		Notes:   req.Notes,
+	}
+	return c.doJSON(ctx, req.Merchant, http.MethodPost, fmt.Sprintf("/api/payin/order/s/%s/dispute/appeal", url.PathEscape(req.OrderID)), body, nil)
+}
+
 func (c *ClientImpl) CreatePayout(ctx context.Context, req *CreatePayoutReq) (*CreatePayoutResp, error) {
 	if err := req.Valid(); err != nil {
 		return nil, err

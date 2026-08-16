@@ -1,6 +1,6 @@
 # Payment Go SDK
 
-Payment 商户网关 Go SDK，用于第三方商户服务端接入代收、代付、订单查询、代收退款和商户通知验签。
+Payment 商户网关 Go SDK，用于第三方商户服务端接入代收、代付、订单查询、代收退款、争议申诉和商户通知验签。
 
 ## 安装
 
@@ -181,6 +181,22 @@ err := client.RefundPayin(ctx, payment.RefundPayinReq{
 	Merchant: merchant,
 	OrderID:  "10201312003",
 	Amount:   10000,
+})
+if err != nil {
+	return err
+}
+```
+
+## 争议申诉
+
+游戏或商户先自己生成申诉 PDF，再把可下载的 HTTPS 地址交给支付。支付会立刻拉取文件并提交渠道。渠道裁决仍走现有争议通知。
+
+```go
+err := client.AppealDispute(ctx, &payment.AppealDisputeReq{
+	Merchant: merchant,
+	OrderID:  "10201312003",
+	FileURL:  "https://files.example/chargeback/packet.pdf",
+	Notes:    "optional seller statement",
 })
 if err != nil {
 	return err

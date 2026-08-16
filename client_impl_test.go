@@ -452,6 +452,57 @@ func TestParseNotifyRejectsUnknownType(t *testing.T) {
 	}
 }
 
+func TestAppealDisputeSignsAndOmitsSecret(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/payin/order/s/9001/dispute/appeal" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), body)
+		if got := r.Header.Get(headerSignature); got != want {
+			t.Fatalf("signature mismatch\nwant: %s\n got: %s", want, got)
+		}
+		if strings.Contains(string(body), "merchant-secret") {
+			t.Fatalf("request body leaked merchant secret: %s", body)
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload["file_url"] != "https://files.example/a.pdf" {
+			t.Fatalf("file_url = %v", payload["file_url"])
+		}
+		if payload["notes"] != "delivered" {
+			t.Fatalf("notes = %v", payload["notes"])
+		}
+		_, _ = w.Write([]byte(`{"message":"success"}`))
+	}))
+	defer server.Close()
+
+	err := testClient(server.URL).AppealDispute(context.Background(), &AppealDisputeReq{
+		Merchant: testMerchant,
+		OrderID:  "9001",
+		FileURL:  "https://files.example/a.pdf",
+		Notes:    "delivered",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAppealDisputeRequiresFileURL(t *testing.T) {
+	err := testClient("http://127.0.0.1").AppealDispute(context.Background(), &AppealDisputeReq{
+		Merchant: testMerchant,
+		OrderID:  "9001",
+	})
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+}
+
 func testClient(baseURL string) *ClientImpl {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil

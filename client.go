@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -15,6 +16,7 @@ type Client interface {
 	SubmitCreditFlow(ctx context.Context, req *SubmitCreditFlowReq) (*SubmitCreditFlowResp, error)
 	GetPayin(ctx context.Context, req *GetPayinReq) (*PayinOrderResp, error)
 	RefundPayin(ctx context.Context, req RefundPayinReq) error
+	AppealDispute(ctx context.Context, req *AppealDisputeReq) error
 	CreatePayout(ctx context.Context, req *CreatePayoutReq) (*CreatePayoutResp, error)
 	GetPayout(ctx context.Context, req *GetPayoutReq) (*PayoutOrderResp, error)
 	NotifyClient
@@ -47,11 +49,15 @@ func (r GetPayoutReq) Valid() error {
 }
 
 func NewClient(env EnvType) *ClientImpl {
+	return NewClientWithBaseURL(env.GetBaseURL())
+}
+
+func NewClientWithBaseURL(baseURL string) *ClientImpl {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 
 	return &ClientImpl{
-		baseURL: env.GetBaseURL(),
+		baseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"),
 		httpClient: &http.Client{
 			Transport: transport,
 			Timeout:   15 * time.Second,
@@ -239,6 +245,17 @@ type RefundPayinReq struct {
 }
 
 func (r RefundPayinReq) Valid() error {
+	return ValidStruct(r)
+}
+
+type AppealDisputeReq struct {
+	Merchant
+	OrderID string `json:"order_id" validate:"required"`
+	FileURL string `json:"file_url" validate:"required"`
+	Notes   string `json:"notes,omitempty"`
+}
+
+func (r AppealDisputeReq) Valid() error {
 	return ValidStruct(r)
 }
 
