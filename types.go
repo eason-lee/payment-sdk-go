@@ -98,7 +98,7 @@ const (
 
 const (
 	productionBaseURL = "http://192.168.1.171"   // TODO 生产环境地址待确认
-	sandboxBaseURL    = "http://192.168.160.191" // TODO 沙箱环境地址待确认
+	sandboxBaseURL    = "https://api-beta.winzay.top"
 	testBaseURL       = "http://127.0.0.1:8083"
 )
 

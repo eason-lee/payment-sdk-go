@@ -16,10 +16,13 @@ client := payment.NewClient(payment.Production())
 
 当前环境：
 
-- `Production()`：正式环境，目前指向 `http://192.168.1.171`
-- `Sandbox()`：本地验证环境，目前指向 `http://127.0.0.1:8080`
+- `Production()`：正式环境，地址待确认
+- `Sandbox()`：beta 商户 API，`https://api-beta.winzay.top`
+- `EnvTest`：本机 `edge-proxy`，`http://127.0.0.1:8083`
 
-如果后续测试环境域名独立，接入方只需要切换初始化环境：
+收款走 `/api/payin/**`，出款走 `/api/payout/**`。不要把 Admin 或渠道 webhook 配进 SDK。
+
+如果后续正式环境域名独立，接入方只需要切换初始化环境：
 
 ```go
 client := payment.NewClient(payment.Sandbox())
