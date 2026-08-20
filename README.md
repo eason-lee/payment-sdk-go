@@ -74,6 +74,7 @@ if err != nil {
 
 ```go
 fmt.Println(resp.OrderID)
+fmt.Println(resp.ChannelOrderID)
 fmt.Println(resp.Link)
 ```
 

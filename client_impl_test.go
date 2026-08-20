@@ -33,7 +33,7 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 		if strings.Contains(string(body), "merchant-secret") {
 			t.Fatalf("request body leaked merchant secret: %s", body)
 		}
-		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2001","link":"https://pay.example/2001"}}`))
+		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2001","channel_order_id":"PP-ORDER-2001","link":"https://pay.example/2001"}}`))
 	}))
 	defer server.Close()
 
@@ -54,6 +54,9 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 	}
 	if resp.OrderID != "2001" {
 		t.Fatalf("order id = %s", resp.OrderID)
+	}
+	if resp.ChannelOrderID != "PP-ORDER-2001" {
+		t.Fatalf("channel order id = %s", resp.ChannelOrderID)
 	}
 }
 

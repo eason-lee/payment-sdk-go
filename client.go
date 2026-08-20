@@ -196,6 +196,7 @@ type GooglePay struct {
 
 type CreatePayinResp struct {
 	OrderID        string                  `json:"order_id"`
+	ChannelOrderID string                  `json:"channel_order_id,omitempty"`
 	Link           string                  `json:"link"`
 	PaymentSession *CheckoutPaymentSession `json:"payment_session,omitempty"`
 }

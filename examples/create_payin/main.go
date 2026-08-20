@@ -32,5 +32,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("order_id=%s link=%s\n", resp.OrderID, resp.Link)
+	fmt.Printf("order_id=%s channel_order_id=%s link=%s\n", resp.OrderID, resp.ChannelOrderID, resp.Link)
 }
