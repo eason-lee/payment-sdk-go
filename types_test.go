@@ -17,7 +17,7 @@ func TestPayModeValidMatchesPayMethod(t *testing.T) {
 	}
 }
 
-func TestCreatePayinReqValidCreditFlowRequiresCityState(t *testing.T) {
+func TestCreatePayinReqValidCreditFlowAllowsMissingCityState(t *testing.T) {
 	req := CreatePayinReq{
 		Merchant:        testMerchant,
 		MerchantOrderID: "M-1",
@@ -27,32 +27,31 @@ func TestCreatePayinReqValidCreditFlowRequiresCityState(t *testing.T) {
 		PayMode:         PayModeCreditFlow,
 		Address:         &Address{Country: "US"},
 	}
-	if err := req.Valid(); err == nil {
-		t.Fatal("missing city/state should fail")
-	}
-	req.Address.State = "CA"
-	req.Address.City = "SF"
 	if err := req.Valid(); err != nil {
 		t.Fatalf("Valid() = %v", err)
 	}
 }
 
-func TestCreatePayinReqValidCreditTokenRequiresToken(t *testing.T) {
+func TestCreatePayinReqValidCreditSourceIdRequiresSourceID(t *testing.T) {
 	req := CreatePayinReq{
 		Merchant:        testMerchant,
 		MerchantOrderID: "M-1",
 		Amount:          100,
 		Currency:        CurrencyTpUSD,
 		PayMethod:       PayMethodCreditCard,
-		PayMode:         PayModeCreditToken,
+		PayMode:         PayModeCreditSourceID,
 		Address:         &Address{Country: "US"},
 	}
 	if err := req.Valid(); err == nil {
-		t.Fatal("missing credit_card.token should fail")
+		t.Fatal("missing credit_card.source_id should fail")
 	}
-	req.CreditCard = &CreditCard{Token: "tok_1"}
+	req.CreditCard = &CreditCard{SourceID: "src_1"}
 	if err := req.Valid(); err != nil {
 		t.Fatalf("Valid() = %v", err)
+	}
+	req.PayMode = "CreditToken"
+	if err := req.Valid(); err == nil {
+		t.Fatal("CreditToken should fail")
 	}
 }
 

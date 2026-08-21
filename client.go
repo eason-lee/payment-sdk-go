@@ -80,7 +80,7 @@ type CreatePayinReq struct {
 	User            *User       `json:"user,omitempty"`                                                                  // 用户信息
 	Address         *Address    `json:"address" validate:"required"`                                                     // 账单/支付地址；支付国放 Country
 	PayPal          *PayPal     `json:"paypal,omitempty"`                                                                // PayPal 支付信息
-	CreditCard      *CreditCard `json:"credit_card,omitempty"`                                                           // 信用卡凭证；CreditToken/CreditSourceId 必填
+	CreditCard      *CreditCard `json:"credit_card,omitempty"`                                                           // 信用卡凭证；CreditSourceId 必填
 	ApplePay        *ApplePay   `json:"apple_pay,omitempty"`                                                             // ApplePay 支付信息
 	GooglePay       *GooglePay  `json:"google_pay,omitempty"`                                                            // GooglePay 支付信息
 }
@@ -101,17 +101,7 @@ func (r CreatePayinReq) Valid() error {
 	if err := r.PayMode.Valid(r.PayMethod); err != nil {
 		return err
 	}
-	if r.PayMode == PayModeCreditFlow {
-		if r.Address.State == "" || r.Address.City == "" {
-			return errors.New("address.state and address.city are required")
-		}
-	}
-	switch r.PayMode {
-	case PayModeCreditToken:
-		if r.CreditCard == nil || r.CreditCard.Token == "" {
-			return errors.New("credit_card.token is required")
-		}
-	case PayModeCreditSourceID:
+	if r.PayMode == PayModeCreditSourceID {
 		if r.CreditCard == nil || r.CreditCard.SourceID == "" {
 			return errors.New("credit_card.source_id is required")
 		}
@@ -136,10 +126,9 @@ type ApplePay struct {
 	AppleToken string `json:"apple_token,omitempty"` // ApplePay支付令牌
 }
 
-// CreditCard 建单信用卡凭证。Token 路径可选传入 tokenize 回包中的卡面信息；地址走顶层 address。
+// CreditCard 建单信用卡凭证。CreditSourceId 必填 source_id；地址走顶层 address。
 type CreditCard struct {
 	SourceID    string `json:"source_id,omitempty"`
-	Token       string `json:"token,omitempty"`
 	CardName    string `json:"card_name,omitempty" validate:"omitempty,max=128"`
 	Last4       string `json:"last4,omitempty" validate:"omitempty,max=4"`
 	ExpiryMonth string `json:"expiry_month,omitempty" validate:"omitempty,max=2"`

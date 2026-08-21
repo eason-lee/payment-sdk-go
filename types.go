@@ -27,7 +27,6 @@ const (
 type PayMode string
 
 const (
-	PayModeCreditToken     PayMode = "CreditToken"     // 原生信用卡
 	PayModeCreditSourceID  PayMode = "CreditSourceId"  // sourceId 信用卡绑卡支付
 	PayModeCreditFlow      PayMode = "CreditFlow"      // Checkout Flow 信用卡
 	PayModePayPal          PayMode = "PayPal"          // 直接拉起的
@@ -45,7 +44,6 @@ var payModeAllowed = map[PayMethod]map[PayMode]struct{}{
 		PayModePayPalAgreement: {},
 	},
 	PayMethodCreditCard: {
-		PayModeCreditToken:    {},
 		PayModeCreditSourceID: {},
 		PayModeCreditFlow:     {},
 	},
@@ -66,7 +64,7 @@ var payModeAllowed = map[PayMethod]map[PayMode]struct{}{
 
 var payModeErrMsg = map[PayMethod]string{
 	PayMethodPayPal:     "payment: paypal pay mode must be PayPal or PayPalAgreement",
-	PayMethodCreditCard: "payment: credit card pay mode must be CreditToken, CreditSourceId or CreditFlow",
+	PayMethodCreditCard: "payment: credit card pay mode must be CreditSourceId or CreditFlow",
 	PayMethodApplePay:   "payment: apple pay pay mode must be ApplePayNative or ApplePayWeb",
 	PayMethodGooglePay:  "payment: google pay pay mode must be GooglePayWeb",
 	PayMethodCashApp:    "payment: cash app pay mode must be CashAppWeb",
@@ -97,7 +95,7 @@ const (
 )
 
 const (
-	productionBaseURL = "http://192.168.1.171"   // TODO 生产环境地址待确认
+	productionBaseURL = "http://192.168.1.171" // TODO 生产环境地址待确认
 	sandboxBaseURL    = "https://api-beta.winzay.top"
 	testBaseURL       = "http://127.0.0.1:8083"
 )

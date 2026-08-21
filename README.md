@@ -118,9 +118,9 @@ fmt.Println(resp.PaymentSession.Token)
 fmt.Println(resp.PaymentSession.Secret)
 ```
 
-### 原生信用卡 Token
+### 存卡 SourceID
 
-`PayModeCreditToken` 使用 `credit_card.token`，不要再传 `credit_token` 或 `checkout`。地址走顶层 `address`。
+`PayModeCreditSourceID` 使用 `credit_card.source_id`。地址走顶层 `address`。
 
 ```go
 resp, err := client.CreatePayin(ctx, payment.CreatePayinReq{
@@ -129,16 +129,12 @@ resp, err := client.CreatePayin(ctx, payment.CreatePayinReq{
 	Amount:          10000,
 	Currency:        payment.CurrencyTpUSD,
 	PayMethod:       payment.PayMethodCreditCard,
-	PayMode:         payment.PayModeCreditToken,
+	PayMode:         payment.PayModeCreditSourceID,
 	Address: &payment.Address{
 		Country: "US",
 	},
 	CreditCard: &payment.CreditCard{
-		Token:       "tok_xxx",
-		CardName:    "John Doe",
-		Last4:       "4242",
-		ExpiryMonth: "12",
-		ExpiryYear:  "2030",
+		SourceID: "src_xxx",
 	},
 })
 ```

@@ -127,7 +127,7 @@ func TestCreatePayinCreditFlowRequestAndResponse(t *testing.T) {
 	}
 }
 
-func TestCreatePayinCreditTokenRequestUsesTokenField(t *testing.T) {
+func TestCreatePayinCreditSourceIdRequestUsesSourceIDField(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -141,11 +141,11 @@ func TestCreatePayinCreditTokenRequestUsesTokenField(t *testing.T) {
 		if !ok {
 			t.Fatalf("credit_card missing: %s", body)
 		}
-		if card["token"] != "tok_2003" {
-			t.Fatalf("credit_card.token = %v", card["token"])
+		if card["source_id"] != "src_2003" {
+			t.Fatalf("credit_card.source_id = %v", card["source_id"])
 		}
-		if _, ok := card["credit_token"]; ok {
-			t.Fatalf("request must not send credit_token: %s", body)
+		if _, ok := card["token"]; ok {
+			t.Fatalf("request must not send token: %s", body)
 		}
 		if card["card_name"] != "John Doe" || card["last4"] != "4242" {
 			t.Fatalf("credit_card = %#v", card)
@@ -161,10 +161,10 @@ func TestCreatePayinCreditTokenRequestUsesTokenField(t *testing.T) {
 		Amount:          1000,
 		Currency:        CurrencyTpUSD,
 		PayMethod:       PayMethodCreditCard,
-		PayMode:         PayModeCreditToken,
+		PayMode:         PayModeCreditSourceID,
 		Address:         &Address{Country: "US"},
 		CreditCard: &CreditCard{
-			Token:       "tok_2003",
+			SourceID:    "src_2003",
 			CardName:    "John Doe",
 			Last4:       "4242",
 			ExpiryMonth: "12",
