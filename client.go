@@ -106,6 +106,11 @@ func (r CreatePayinReq) Valid() error {
 			return errors.New("credit_card.source_id is required")
 		}
 	}
+	if r.PayMode == PayModeGooglePayNative {
+		if r.GooglePay == nil || r.GooglePay.Signature == "" || r.GooglePay.SignedMessage == "" || r.GooglePay.ProtocolVersion == "" {
+			return errors.New("google_pay is required")
+		}
+	}
 	return nil
 }
 

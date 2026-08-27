@@ -15,6 +15,12 @@ func TestPayModeValidMatchesPayMethod(t *testing.T) {
 	if err := PayModeCashAppWeb.Valid(PayMethodCashApp); err != nil {
 		t.Fatalf("CashAppWeb + CashApp: %v", err)
 	}
+	if err := PayModeGooglePayNative.Valid(PayMethodGooglePay); err != nil {
+		t.Fatalf("GooglePayNative + GooglePay: %v", err)
+	}
+	if err := PayModeGooglePayWeb.Valid(PayMethodGooglePay); err != nil {
+		t.Fatalf("GooglePayWeb + GooglePay: %v", err)
+	}
 }
 
 func TestCreatePayinReqValidCreditFlowAllowsMissingCityState(t *testing.T) {
@@ -52,6 +58,30 @@ func TestCreatePayinReqValidCreditSourceIdRequiresSourceID(t *testing.T) {
 	req.PayMode = "CreditToken"
 	if err := req.Valid(); err == nil {
 		t.Fatal("CreditToken should fail")
+	}
+}
+
+func TestCreatePayinReqValidGooglePayNativeRequiresToken(t *testing.T) {
+	req := CreatePayinReq{
+		Merchant:        testMerchant,
+		MerchantOrderID: "M-1",
+		Amount:          100,
+		Currency:        CurrencyTpUSD,
+		PayMethod:       PayMethodGooglePay,
+		PayMode:         PayModeGooglePayNative,
+		Address:         &Address{Country: "US"},
+	}
+	if err := req.Valid(); err == nil {
+		t.Fatal("missing google_pay should fail")
+	}
+	req.GooglePay = &GooglePay{Signature: "sig", SignedMessage: "msg", ProtocolVersion: "ECv2"}
+	if err := req.Valid(); err != nil {
+		t.Fatalf("Valid() = %v", err)
+	}
+	req.PayMode = PayModeGooglePayWeb
+	req.GooglePay = nil
+	if err := req.Valid(); err != nil {
+		t.Fatalf("GooglePayWeb Valid() = %v", err)
 	}
 }
 

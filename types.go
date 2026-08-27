@@ -33,6 +33,7 @@ const (
 	PayModePayPalAgreement PayMode = "PayPalAgreement" // 授权绑定唯一ID的
 	PayModeApplePayNative  PayMode = "ApplePayNative"  // 原生 applePay
 	PayModeApplePayWeb     PayMode = "ApplePayWeb"     // 外跳 applePay
+	PayModeGooglePayNative PayMode = "GooglePayNative" // SDK tokenize googlePay
 	PayModeGooglePayWeb    PayMode = "GooglePayWeb"    // 外跳 googlePay
 	PayModeCashAppWeb      PayMode = "CashAppWeb"      // 外跳 cashApp
 	PayModeSkrillWeb       PayMode = "SkrillWeb"       // 外跳 skrill
@@ -52,7 +53,8 @@ var payModeAllowed = map[PayMethod]map[PayMode]struct{}{
 		PayModeApplePayWeb:    {},
 	},
 	PayMethodGooglePay: {
-		PayModeGooglePayWeb: {},
+		PayModeGooglePayNative: {},
+		PayModeGooglePayWeb:    {},
 	},
 	PayMethodCashApp: {
 		PayModeCashAppWeb: {},
@@ -66,7 +68,7 @@ var payModeErrMsg = map[PayMethod]string{
 	PayMethodPayPal:     "payment: paypal pay mode must be PayPal or PayPalAgreement",
 	PayMethodCreditCard: "payment: credit card pay mode must be CreditSourceId or CreditFlow",
 	PayMethodApplePay:   "payment: apple pay pay mode must be ApplePayNative or ApplePayWeb",
-	PayMethodGooglePay:  "payment: google pay pay mode must be GooglePayWeb",
+	PayMethodGooglePay:  "payment: google pay pay mode must be GooglePayNative or GooglePayWeb",
 	PayMethodCashApp:    "payment: cash app pay mode must be CashAppWeb",
 	PayMethodSkrill:     "payment: skrill pay mode must be SkrillWeb",
 }
