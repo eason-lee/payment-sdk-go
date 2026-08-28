@@ -82,6 +82,7 @@ type CreatePayinReq struct {
 	PayMode         PayMode     `json:"pay_mode" validate:"required"`                                                    // 支付模式
 	User            *User       `json:"user,omitempty"`                                                                  // 用户信息
 	Address         *Address    `json:"address" validate:"required"`                                                     // 账单/支付地址；支付国放 Country
+	RiskToken       string      `json:"risk_token,omitempty"`                                                            // 不透明设备指纹；只用于本次风控，不落库
 	PayPal          *PayPal     `json:"paypal,omitempty"`                                                                // PayPal 支付信息
 	CreditCard      *CreditCard `json:"credit_card,omitempty"`                                                           // 信用卡凭证；CreditSourceId 必填
 	ApplePay        *ApplePay   `json:"apple_pay,omitempty"`                                                             // ApplePay 支付信息
@@ -118,11 +119,16 @@ func (r CreatePayinReq) Valid() error {
 }
 
 type User struct {
-	ID      string `json:"id" validate:"required"`              // 用户ID
-	AppName string `json:"app_name" validate:"required,max=50"` // 应用名称
-	Name    string `json:"name,omitempty"`                      // 用户姓名
-	Email   string `json:"email,omitempty"`                     // 用户邮箱
-	Phone   string `json:"phone,omitempty"`                     // 用户手机号
+	ID         string `json:"id" validate:"required"`              // 用户ID
+	AppName    string `json:"app_name" validate:"required,max=50"` // 应用名称
+	Name       string `json:"name,omitempty"`                      // 用户姓名
+	Email      string `json:"email,omitempty"`                     // 用户邮箱
+	Phone      string `json:"phone,omitempty"`                     // 用户手机号
+	IP         string `json:"ip,omitempty"`                        // 付款人终端 IP；RiskEnabled 时必填
+	UserAgent  string `json:"user_agent,omitempty"`                // 付款人 User-Agent；RiskEnabled 时必填
+	DeviceType string `json:"device_type,omitempty"`               // 终端类型，空则网关按 WEB
+	DeviceID   string `json:"device_id,omitempty"`                 // 商户侧设备标识
+	CreatedAt  int64  `json:"created_at,omitempty"`                // 账号注册时间，Unix 秒
 }
 
 type PayPal struct {
@@ -166,6 +172,10 @@ type SubmitCreditFlowReq struct {
 	SessionData string `json:"session_data" validate:"required"`
 	// Card 非敏感卡片风险快照；禁止 PAN/CVV。
 	Card *CardRiskSnapshot `json:"card" validate:"required"`
+	// IP / UserAgent / RiskToken 可选补强；建单已传则可不填。
+	IP        string `json:"ip,omitempty"`
+	UserAgent string `json:"user_agent,omitempty"`
+	RiskToken string `json:"risk_token,omitempty"`
 }
 
 func (r SubmitCreditFlowReq) Valid() error {

@@ -5,7 +5,7 @@ Payment 商户网关 Go SDK，用于第三方商户服务端接入代收、代�
 ## 安装
 
 ```bash
-go get github.com/eason-lee/payment-sdk-go@v0.1.11
+go get github.com/eason-lee/payment-sdk-go@v0.1.12
 ```
 
 ## 创建客户端
@@ -52,12 +52,17 @@ resp, err := client.CreatePayin(ctx, payment.CreatePayinReq{
 	PayMethod:       payment.PayMethodPayPal,
 	PayMode:         payment.PayModePayPalAgreement,
 	User: &payment.User{
-		ID:      "u_1001",
-		AppName: "DemoApp",
-		Name:    "John Doe",
-		Email:   "john@example.com",
-		Phone:   "+10000000000",
+		ID:         "u_1001",
+		AppName:    "DemoApp",
+		Name:       "John Doe",
+		Email:      "john@example.com",
+		Phone:      "+10000000000",
+		IP:         "203.0.113.10",
+		UserAgent:  "Mozilla/5.0",
+		DeviceType: "WEB",
+		CreatedAt:  1731280948,
 	},
+	RiskToken: "forter-or-device-fingerprint",
 	Address: &payment.Address{
 		Country: "US",
 	},
@@ -79,6 +84,8 @@ fmt.Println(resp.Link)
 ```
 
 如果 `resp.Link` 不为空，商户可以把用户跳转到该链接完成支付。
+
+商户开启风控（`RiskEnabled`）时，`user.ip` 和 `user.user_agent` 必填，且必须是付款人终端地址，不要填机房出口 IP。`risk_token` 是收银台采集的不透明设备指纹（Forter cookie 或 mobile UID），只用于本次校验。
 
 ### Checkout 信用卡 Payment Session
 

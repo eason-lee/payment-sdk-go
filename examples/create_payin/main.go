@@ -23,9 +23,13 @@ func main() {
 		PayMethod:       payment.PayMethodPayPal,
 		PayMode:         payment.PayModePayPalAgreement,
 		User: &payment.User{
-			ID:      "u_1001",
-			AppName: "DemoApp",
+			ID:         "u_1001",
+			AppName:    "DemoApp",
+			IP:         "203.0.113.10",
+			UserAgent:  "Mozilla/5.0",
+			DeviceType: "WEB",
 		},
+		RiskToken: "device-fingerprint",
 		Address: &payment.Address{Country: "US"},
 		PayPal:  &payment.PayPal{Email: "buyer@example.com"},
 	})

@@ -33,6 +33,26 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 		if strings.Contains(string(body), "merchant-secret") {
 			t.Fatalf("request body leaked merchant secret: %s", body)
 		}
+		var payload map[string]any
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Fatal(err)
+		}
+		user, ok := payload["user"].(map[string]any)
+		if !ok {
+			t.Fatalf("user missing: %s", body)
+		}
+		if user["ip"] != "203.0.113.10" || user["user_agent"] != "Mozilla/5.0" {
+			t.Fatalf("user env = %#v", user)
+		}
+		if user["device_type"] != "WEB" || user["device_id"] != "dev-1" {
+			t.Fatalf("user device = %#v", user)
+		}
+		if user["created_at"] != float64(1731280948) {
+			t.Fatalf("user.created_at = %v", user["created_at"])
+		}
+		if payload["risk_token"] != "forter-cookie-token" {
+			t.Fatalf("risk_token = %v", payload["risk_token"])
+		}
 		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2001","channel_order_id":"PP-ORDER-2001","link":"https://pay.example/2001"}}`))
 	}))
 	defer server.Close()
@@ -45,9 +65,18 @@ func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 		Currency:        CurrencyTpUSD,
 		PayMethod:       PayMethodPayPal,
 		PayMode:         PayModePayPalAgreement,
-		User:            &User{ID: "u_1001", AppName: "DemoApp"},
-		Address:         &Address{Country: "US", Address: "100 Main St", State: "NY", City: "New York", Zip: "10001"},
-		PayPal:          &PayPal{Email: "buyer@example.com"},
+		User: &User{
+			ID:         "u_1001",
+			AppName:    "DemoApp",
+			IP:         "203.0.113.10",
+			UserAgent:  "Mozilla/5.0",
+			DeviceType: "WEB",
+			DeviceID:   "dev-1",
+			CreatedAt:  1731280948,
+		},
+		RiskToken: "forter-cookie-token",
+		Address:   &Address{Country: "US", Address: "100 Main St", State: "NY", City: "New York", Zip: "10001"},
+		PayPal:    &PayPal{Email: "buyer@example.com"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -202,6 +231,12 @@ func TestSubmitCreditFlowSendsCardRiskInfoFields(t *testing.T) {
 		if _, ok := card["name_on_card"]; ok {
 			t.Fatalf("request must not send name_on_card: %s", body)
 		}
+		if payload["ip"] != "203.0.113.11" || payload["user_agent"] != "ua-2" {
+			t.Fatalf("submit env = %#v", payload)
+		}
+		if payload["risk_token"] != "mobile-uid" {
+			t.Fatalf("risk_token = %v", payload["risk_token"])
+		}
 		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2002","status":"pending"}}`))
 	}))
 	defer server.Close()
@@ -219,6 +254,9 @@ func TestSubmitCreditFlowSendsCardRiskInfoFields(t *testing.T) {
 			ExpiryYear:  "2030",
 			Country:     "US",
 		},
+		IP:        "203.0.113.11",
+		UserAgent: "ua-2",
+		RiskToken: "mobile-uid",
 	})
 	if err != nil {
 		t.Fatal(err)

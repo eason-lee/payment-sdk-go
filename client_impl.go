@@ -45,10 +45,16 @@ func (c *ClientImpl) SubmitCreditFlow(ctx context.Context, req *SubmitCreditFlow
 		SessionID   string            `json:"session_id"`
 		SessionData string            `json:"session_data"`
 		Card        *CardRiskSnapshot `json:"card"`
+		IP          string            `json:"ip,omitempty"`
+		UserAgent   string            `json:"user_agent,omitempty"`
+		RiskToken   string            `json:"risk_token,omitempty"`
 	}{
 		SessionID:   strings.TrimSpace(req.SessionID),
 		SessionData: req.SessionData,
 		Card:        req.Card,
+		IP:          strings.TrimSpace(req.IP),
+		UserAgent:   strings.TrimSpace(req.UserAgent),
+		RiskToken:   strings.TrimSpace(req.RiskToken),
 	}
 
 	var out SubmitCreditFlowResp
