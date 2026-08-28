@@ -5,7 +5,7 @@ Payment 商户网关 Go SDK，用于第三方商户服务端接入代收、代�
 ## 安装
 
 ```bash
-go get github.com/eason-lee/payment-sdk-go@v0.1.10
+go get github.com/eason-lee/payment-sdk-go@v0.1.11
 ```
 
 ## 创建客户端
