@@ -95,6 +95,67 @@ func (c *ClientImpl) AppealDispute(ctx context.Context, req *AppealDisputeReq) e
 	return c.doJSON(ctx, req.Merchant, http.MethodPost, fmt.Sprintf("/api/payin/order/s/%s/dispute/appeal", url.PathEscape(req.OrderID)), body, nil)
 }
 
+func (c *ClientImpl) BindPayPalAgreement(ctx context.Context, req *BindPayPalAgreementReq) (*BindPayPalAgreementResp, error) {
+	if req == nil {
+		return nil, errors.New("payment: bind paypal agreement request is required")
+	}
+	if err := req.Valid(); err != nil {
+		return nil, err
+	}
+
+	body := struct {
+		Currency CurrencyTp `json:"currency"`
+		AppName  string     `json:"app_name"`
+		UserID   string     `json:"user_id"`
+	}{
+		Currency: req.Currency,
+		AppName:  req.AppName,
+		UserID:   req.UserID,
+	}
+
+	var out BindPayPalAgreementResp
+	if err := c.doJSON(ctx, req.Merchant, http.MethodPost, "/api/payin/order/agreement", body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *ClientImpl) CancelPayPalAgreement(ctx context.Context, req *CancelPayPalAgreementReq) error {
+	if req == nil {
+		return errors.New("payment: cancel paypal agreement request is required")
+	}
+	if err := req.Valid(); err != nil {
+		return err
+	}
+
+	body := struct {
+		PayPalEmail string `json:"paypalEmail"`
+		AppName     string `json:"app_name"`
+		PlayerID    string `json:"player_id"`
+	}{
+		PayPalEmail: req.PayPalEmail,
+		AppName:     req.AppName,
+		PlayerID:    req.UserID,
+	}
+	return c.doJSON(ctx, req.Merchant, http.MethodPost, "/api/payin/order/agreement/cancel", body, nil)
+}
+
+func (c *ClientImpl) ApprovePayPalAgreement(ctx context.Context, req *ApprovePayPalAgreementReq) error {
+	if req == nil {
+		return errors.New("payment: approve paypal agreement request is required")
+	}
+	if err := req.Valid(); err != nil {
+		return err
+	}
+
+	body := struct {
+		Token string `json:"token"`
+	}{
+		Token: req.Token,
+	}
+	return c.doJSON(ctx, req.Merchant, http.MethodPost, "/api/payin/order/agreement/approve", body, nil)
+}
+
 func (c *ClientImpl) CreatePayout(ctx context.Context, req *CreatePayoutReq) (*CreatePayoutResp, error) {
 	if err := req.Valid(); err != nil {
 		return nil, err

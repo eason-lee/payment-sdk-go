@@ -504,6 +504,142 @@ func TestAppealDisputeRequiresFileURL(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected validation error")
 	}
+
+}
+
+func TestBindPayPalAgreementSignsAndOmitsSecret(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/payin/order/agreement" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), body)
+		if got := r.Header.Get(headerSignature); got != want {
+			t.Fatalf("signature mismatch\nwant: %s\n got: %s", want, got)
+		}
+		if strings.Contains(string(body), "merchant-secret") {
+			t.Fatalf("request body leaked merchant secret: %s", body)
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload["currency"] != string(CurrencyTpUSD) {
+			t.Fatalf("currency = %v", payload["currency"])
+		}
+		if payload["app_name"] != "DemoApp" {
+			t.Fatalf("app_name = %v", payload["app_name"])
+		}
+		if payload["user_id"] != "u_1001" {
+			t.Fatalf("user_id = %v", payload["user_id"])
+		}
+		_, _ = w.Write([]byte(`{"message":"success","data":{"token":"tok-1","link":"https://paypal.example/agree","redirect_link":"https://merchant.example/return","status":"PENDING"}}`))
+	}))
+	defer server.Close()
+
+	resp, err := testClient(server.URL).BindPayPalAgreement(context.Background(), &BindPayPalAgreementReq{
+		Merchant: testMerchant,
+		Currency: CurrencyTpUSD,
+		AppName:  "DemoApp",
+		UserID:   "u_1001",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Token != "tok-1" || resp.Link == "" || resp.Status != "PENDING" {
+		t.Fatalf("resp = %+v", resp)
+	}
+}
+
+func TestCancelPayPalAgreementMapsUserIDToPlayerID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/payin/order/agreement/cancel" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), body)
+		if got := r.Header.Get(headerSignature); got != want {
+			t.Fatalf("signature mismatch\nwant: %s\n got: %s", want, got)
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload["paypalEmail"] != "buyer@example.com" {
+			t.Fatalf("paypalEmail = %v", payload["paypalEmail"])
+		}
+		if payload["app_name"] != "DemoApp" {
+			t.Fatalf("app_name = %v", payload["app_name"])
+		}
+		if payload["player_id"] != "u_1001" {
+			t.Fatalf("player_id = %v", payload["player_id"])
+		}
+		if _, ok := payload["user_id"]; ok {
+			t.Fatalf("cancel body must not send user_id: %s", body)
+		}
+		_, _ = w.Write([]byte(`{"message":"success"}`))
+	}))
+	defer server.Close()
+
+	err := testClient(server.URL).CancelPayPalAgreement(context.Background(), &CancelPayPalAgreementReq{
+		Merchant:    testMerchant,
+		AppName:     "DemoApp",
+		UserID:      "u_1001",
+		PayPalEmail: "buyer@example.com",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestApprovePayPalAgreementSendsToken(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/payin/order/agreement/approve" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), body)
+		if got := r.Header.Get(headerSignature); got != want {
+			t.Fatalf("signature mismatch\nwant: %s\n got: %s", want, got)
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload["token"] != "tok-1" {
+			t.Fatalf("token = %v", payload["token"])
+		}
+		_, _ = w.Write([]byte(`{"message":"success"}`))
+	}))
+	defer server.Close()
+
+	err := testClient(server.URL).ApprovePayPalAgreement(context.Background(), &ApprovePayPalAgreementReq{
+		Merchant: testMerchant,
+		Token:    "tok-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBindPayPalAgreementRequiresUserID(t *testing.T) {
+	_, err := testClient("http://127.0.0.1").BindPayPalAgreement(context.Background(), &BindPayPalAgreementReq{
+		Merchant: testMerchant,
+		Currency: CurrencyTpUSD,
+		AppName:  "DemoApp",
+	})
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
 }
 
 func testClient(baseURL string) *ClientImpl {

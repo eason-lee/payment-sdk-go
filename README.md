@@ -1,6 +1,6 @@
 # Payment Go SDK
 
-Payment 商户网关 Go SDK，用于第三方商户服务端接入代收、代付、订单查询、代收退款、争议申诉和商户通知验签。
+Payment 商户网关 Go SDK，用于第三方商户服务端接入代收、代付、PayPal 签约、订单查询、代收退款、争议申诉和商户通知验签。
 
 ## 安装
 
@@ -202,6 +202,44 @@ if err != nil {
 	return err
 }
 ```
+
+## PayPal 签约
+
+商户服务端先绑定协议，把返回的 `Link` 交给用户授权。授权完成后可调用 `ApprovePayPalAgreement`，或等 PayPal 回跳/通知。已生效协议用 `CancelPayPalAgreement` 取消。
+
+```go
+resp, err := client.BindPayPalAgreement(ctx, &payment.BindPayPalAgreementReq{
+	Merchant: merchant,
+	Currency: payment.CurrencyTpUSD,
+	AppName:  "DemoApp",
+	UserID:   "u_1001",
+})
+if err != nil {
+	return err
+}
+fmt.Println(resp.Token)
+fmt.Println(resp.Link)
+
+err = client.ApprovePayPalAgreement(ctx, &payment.ApprovePayPalAgreementReq{
+	Merchant: merchant,
+	Token:    resp.Token,
+})
+if err != nil {
+	return err
+}
+
+err = client.CancelPayPalAgreement(ctx, &payment.CancelPayPalAgreementReq{
+	Merchant:    merchant,
+	AppName:     "DemoApp",
+	UserID:      "u_1001",
+	PayPalEmail: "buyer@example.com",
+})
+if err != nil {
+	return err
+}
+```
+
+用户授权完成后，再用 `PayModePayPalAgreement` 建单扣款。签约结果也会走 `MerchantNotifyTpPayInAgreement` 通知。
 
 ## 创建代付订单
 

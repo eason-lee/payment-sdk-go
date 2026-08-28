@@ -17,6 +17,9 @@ type Client interface {
 	GetPayin(ctx context.Context, req *GetPayinReq) (*PayinOrderResp, error)
 	RefundPayin(ctx context.Context, req RefundPayinReq) error
 	AppealDispute(ctx context.Context, req *AppealDisputeReq) error
+	BindPayPalAgreement(ctx context.Context, req *BindPayPalAgreementReq) (*BindPayPalAgreementResp, error)
+	CancelPayPalAgreement(ctx context.Context, req *CancelPayPalAgreementReq) error
+	ApprovePayPalAgreement(ctx context.Context, req *ApprovePayPalAgreementReq) error
 	CreatePayout(ctx context.Context, req *CreatePayoutReq) (*CreatePayoutResp, error)
 	GetPayout(ctx context.Context, req *GetPayoutReq) (*PayoutOrderResp, error)
 	NotifyClient
@@ -251,6 +254,44 @@ type AppealDisputeReq struct {
 }
 
 func (r AppealDisputeReq) Valid() error {
+	return ValidStruct(r)
+}
+
+type BindPayPalAgreementReq struct {
+	Merchant
+	Currency CurrencyTp `json:"currency" validate:"required,oneof=USD EUR GBP"`
+	AppName  string     `json:"app_name" validate:"required,max=50"`
+	UserID   string     `json:"user_id" validate:"required,max=64"`
+}
+
+func (r BindPayPalAgreementReq) Valid() error {
+	return ValidStruct(r)
+}
+
+type BindPayPalAgreementResp struct {
+	Token        string `json:"token"`
+	Link         string `json:"link"`
+	RedirectLink string `json:"redirect_link"`
+	Status       string `json:"status"`
+}
+
+type CancelPayPalAgreementReq struct {
+	Merchant
+	AppName     string `json:"app_name" validate:"required,max=50"`
+	UserID      string `json:"user_id" validate:"required,max=64"`
+	PayPalEmail string `json:"paypalEmail" validate:"required,email"`
+}
+
+func (r CancelPayPalAgreementReq) Valid() error {
+	return ValidStruct(r)
+}
+
+type ApprovePayPalAgreementReq struct {
+	Merchant
+	Token string `json:"token" validate:"required"`
+}
+
+func (r ApprovePayPalAgreementReq) Valid() error {
 	return ValidStruct(r)
 }
 
