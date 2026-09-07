@@ -34,17 +34,19 @@ func (c *ClientImpl) CreatePayin(ctx context.Context, req *CreatePayinReq) (*Cre
 	return &out, nil
 }
 
-func (c *ClientImpl) SubmitCreditFlow(ctx context.Context, req *SubmitCreditFlowReq) (*SubmitCreditFlowResp, error) {
+func (c *ClientImpl) Submit(ctx context.Context, req *SubmitReq) (*SubmitResp, error) {
 	if err := req.Valid(); err != nil {
 		return nil, err
 	}
 
-	path := fmt.Sprintf("/api/payin/order/s/%s/checkout/submit", url.PathEscape(req.OrderID))
+	path := fmt.Sprintf("/api/payin/order/s/%s/submit", url.PathEscape(req.OrderID))
 	// body 不含 order_id / merchant 密钥；merchant 只用于签名头。
 	body := struct {
-		SessionID   string            `json:"session_id"`
-		SessionData string            `json:"session_data"`
-		Card        *CardRiskSnapshot `json:"card"`
+		SessionID   string            `json:"session_id,omitempty"`
+		SessionData string            `json:"session_data,omitempty"`
+		Card        *CardRiskSnapshot `json:"card,omitempty"`
+		ApplePay    *ApplePay         `json:"apple_pay,omitempty"`
+		GooglePay   *GooglePay        `json:"google_pay,omitempty"`
 		IP          string            `json:"ip,omitempty"`
 		UserAgent   string            `json:"user_agent,omitempty"`
 		RiskToken   string            `json:"risk_token,omitempty"`
@@ -52,12 +54,14 @@ func (c *ClientImpl) SubmitCreditFlow(ctx context.Context, req *SubmitCreditFlow
 		SessionID:   strings.TrimSpace(req.SessionID),
 		SessionData: req.SessionData,
 		Card:        req.Card,
+		ApplePay:    req.ApplePay,
+		GooglePay:   req.GooglePay,
 		IP:          strings.TrimSpace(req.IP),
 		UserAgent:   strings.TrimSpace(req.UserAgent),
 		RiskToken:   strings.TrimSpace(req.RiskToken),
 	}
 
-	var out SubmitCreditFlowResp
+	var out SubmitResp
 	if err := c.doJSON(ctx, req.Merchant, http.MethodPost, path, body, &out); err != nil {
 		return nil, err
 	}

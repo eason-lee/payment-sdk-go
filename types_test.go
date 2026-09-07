@@ -61,7 +61,7 @@ func TestCreatePayinReqValidCreditSourceIdRequiresSourceID(t *testing.T) {
 	}
 }
 
-func TestCreatePayinReqValidGooglePayNativeRequiresToken(t *testing.T) {
+func TestCreatePayinReqValidGooglePayNativeDoesNotRequireToken(t *testing.T) {
 	req := CreatePayinReq{
 		Merchant:        testMerchant,
 		MerchantOrderID: "M-1",
@@ -71,23 +71,51 @@ func TestCreatePayinReqValidGooglePayNativeRequiresToken(t *testing.T) {
 		PayMode:         PayModeGooglePayNative,
 		Address:         &Address{Country: "US"},
 	}
-	if err := req.Valid(); err == nil {
-		t.Fatal("missing google_pay should fail")
-	}
-	req.GooglePay = &GooglePay{Signature: "sig", SignedMessage: "msg", ProtocolVersion: "ECv2"}
 	if err := req.Valid(); err != nil {
-		t.Fatalf("Valid() = %v", err)
+		t.Fatalf("GooglePayNative Create Valid() = %v", err)
 	}
 	req.PayMode = PayModeGooglePayWeb
-	req.GooglePay = nil
 	if err := req.Valid(); err != nil {
 		t.Fatalf("GooglePayWeb Valid() = %v", err)
 	}
 }
 
-func TestPayinOrderStatusCanceledValue(t *testing.T) {
-	if PayinOrderStatusCanceled != 6 {
-		t.Fatalf("PayinOrderStatusCanceled = %d, want 6", PayinOrderStatusCanceled)
+func TestSubmitReqValidRequiresCredentials(t *testing.T) {
+	req := SubmitReq{Merchant: testMerchant, OrderID: "1"}
+	if err := req.Valid(); err == nil {
+		t.Fatal("empty submit should fail")
+	}
+	req.SessionID = "ps_x"
+	req.SessionData = "data"
+	if err := req.Valid(); err == nil {
+		t.Fatal("CreditFlow without card should fail")
+	}
+	req.Card = &CardRiskSnapshot{Last4: "4242"}
+	if err := req.Valid(); err != nil {
+		t.Fatalf("CreditFlow Valid() = %v", err)
+	}
+	native := SubmitReq{
+		Merchant:  testMerchant,
+		OrderID:   "2",
+		GooglePay: &GooglePay{Signature: "sig", SignedMessage: "msg", ProtocolVersion: "ECv2"},
+	}
+	if err := native.Valid(); err != nil {
+		t.Fatalf("GooglePayNative Submit Valid() = %v", err)
+	}
+}
+
+func TestPayinOrderStatusAlignsGateway(t *testing.T) {
+	if PayinOrderStatusWaitingSubmit != 1 {
+		t.Fatalf("WaitingSubmit = %d, want 1", PayinOrderStatusWaitingSubmit)
+	}
+	if PayinOrderStatusProcessing != 2 {
+		t.Fatalf("Processing = %d, want 2", PayinOrderStatusProcessing)
+	}
+	if PayinOrderStatusCanceled != 3 {
+		t.Fatalf("Canceled = %d, want 3", PayinOrderStatusCanceled)
+	}
+	if PayinOrderStatusSuccess != 4 {
+		t.Fatalf("Success = %d, want 4", PayinOrderStatusSuccess)
 	}
 }
 

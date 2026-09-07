@@ -30,11 +30,11 @@ func main() {
 			DeviceType: "WEB",
 		},
 		RiskToken: "device-fingerprint",
-		Address: &payment.Address{Country: "US"},
-		PayPal:  &payment.PayPal{Email: "buyer@example.com"},
+		Address:   &payment.Address{Country: "US"},
+		PayPal:    &payment.PayPal{Email: "buyer@example.com"},
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("order_id=%s channel_order_id=%s link=%s\n", resp.OrderID, resp.ChannelOrderID, resp.Link)
+	fmt.Printf("order_id=%s channel=%s next_action=%s status=%d link=%s\n", resp.OrderID, resp.Channel, resp.NextAction, resp.Status, resp.Link)
 }

@@ -152,14 +152,27 @@ const (
 	MerchantNotifyTpPayInFraud MerchantNotifyTp = 7
 )
 
-// PayinOrderStatus 是商户侧可见的代收订单状态。
+// NextAction 是 CreatePayin 之后前端应执行的动作。
+type NextAction string
+
+const (
+	NextActionSubmit   NextAction = "submit"
+	NextActionRedirect NextAction = "redirect"
+	NextActionWait     NextAction = "wait"
+)
+
+// PayinOrderStatus 是商户侧可见的代收订单状态，数值与网关 proto 对齐。
 type PayinOrderStatus int
 
 const (
 	// PayinOrderStatusUnspecified 表示未知代收订单状态，正常业务不应依赖该状态。
 	PayinOrderStatusUnspecified PayinOrderStatus = iota
+	// PayinOrderStatusWaitingSubmit 表示渠道已冻结，等待 Submit。
+	PayinOrderStatusWaitingSubmit
 	// PayinOrderStatusProcessing 表示代收订单处理中，请等待通知或继续查询。
 	PayinOrderStatusProcessing
+	// PayinOrderStatusCanceled 表示代收订单已取消。
+	PayinOrderStatusCanceled
 	// PayinOrderStatusSuccess 表示代收订单支付成功。
 	PayinOrderStatusSuccess
 	// PayinOrderStatusFailed 表示代收订单支付失败。
@@ -168,8 +181,6 @@ const (
 	PayinOrderStatusRefunding
 	// PayinOrderStatusRefunded 表示代收订单已退款。
 	PayinOrderStatusRefunded
-	// PayinOrderStatusCanceled 表示代收订单已取消。
-	PayinOrderStatusCanceled
 )
 
 // PayoutOrderStatus 是商户侧可见的代付订单状态。

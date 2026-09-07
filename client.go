@@ -11,9 +11,9 @@ import (
 // Client calls payment merchant gateway APIs.
 type Client interface {
 	CreatePayin(ctx context.Context, req *CreatePayinReq) (*CreatePayinResp, error)
-	// SubmitCreditFlow 提交 CreditFlow payment session：Forter 前置风控后由 payment 调用 Checkout submit。
-	// 必须由 Merchant 服务端调用；前端只通过 Checkout Flow handleSubmit 拿到 session_data 与非敏感卡片快照。
-	SubmitCreditFlow(ctx context.Context, req *SubmitCreditFlowReq) (*SubmitCreditFlowResp, error)
+	// Submit 提交已冻结渠道的支付（CreditFlow / ApplePayNative / GooglePayNative）。
+	// 必须由 Merchant 服务端调用。CreditFlow 的 session_data 来自 Checkout Flow handleSubmit。
+	Submit(ctx context.Context, req *SubmitReq) (*SubmitResp, error)
 	GetPayin(ctx context.Context, req *GetPayinReq) (*PayinOrderResp, error)
 	RefundPayin(ctx context.Context, req RefundPayinReq) error
 	AppealDispute(ctx context.Context, req *AppealDisputeReq) error
@@ -85,8 +85,6 @@ type CreatePayinReq struct {
 	RiskToken       string      `json:"risk_token,omitempty"`                                                            // 不透明设备指纹；只用于本次风控，不落库
 	PayPal          *PayPal     `json:"paypal,omitempty"`                                                                // PayPal 支付信息
 	CreditCard      *CreditCard `json:"credit_card,omitempty"`                                                           // 信用卡凭证；CreditSourceId 必填
-	ApplePay        *ApplePay   `json:"apple_pay,omitempty"`                                                             // ApplePay 支付信息
-	GooglePay       *GooglePay  `json:"google_pay,omitempty"`                                                            // GooglePay 支付信息
 }
 
 // Address 账单/支付地址。支付国使用 Country。
@@ -108,11 +106,6 @@ func (r CreatePayinReq) Valid() error {
 	if r.PayMode == PayModeCreditSourceID {
 		if r.CreditCard == nil || r.CreditCard.SourceID == "" {
 			return errors.New("credit_card.source_id is required")
-		}
-	}
-	if r.PayMode == PayModeGooglePayNative {
-		if r.GooglePay == nil || r.GooglePay.Signature == "" || r.GooglePay.SignedMessage == "" || r.GooglePay.ProtocolVersion == "" {
-			return errors.New("google_pay is required")
 		}
 	}
 	return nil
@@ -161,32 +154,58 @@ type CardRiskSnapshot struct {
 	Country     string `json:"country,omitempty"`
 }
 
-// SubmitCreditFlowReq 是 CreditFlow 第二阶段服务端提交请求。
-type SubmitCreditFlowReq struct {
+// SubmitReq 是第二步提交渠道支付请求。凭证按订单已冻结的 PayMode 解释。
+type SubmitReq struct {
 	Merchant
 	// OrderID 是 CreatePayin 返回的 payment 订单 ID。
-	OrderID string `json:"-" validate:"required"`
-	// SessionID 必须与建单返回的 PaymentSession.ID 一致。
-	SessionID string `json:"session_id" validate:"required"`
+	OrderID string `json:"-"`
+	// SessionID 必须与建单返回的 PaymentSession.ID 一致（CreditFlow）。
+	SessionID string `json:"session_id,omitempty"`
 	// SessionData 来自 Checkout Flow handleSubmit，不透明，不要写入日志。
-	SessionData string `json:"session_data" validate:"required"`
-	// Card 非敏感卡片风险快照；禁止 PAN/CVV。
-	Card *CardRiskSnapshot `json:"card" validate:"required"`
+	SessionData string `json:"session_data,omitempty"`
+	// Card 非敏感卡片风险快照；禁止 PAN/CVV。CreditFlow 必填。
+	Card *CardRiskSnapshot `json:"card,omitempty"`
+	// ApplePay Native Submit 凭证。
+	ApplePay *ApplePay `json:"apple_pay,omitempty"`
+	// GooglePay Native Submit 凭证。
+	GooglePay *GooglePay `json:"google_pay,omitempty"`
 	// IP / UserAgent / RiskToken 可选补强；建单已传则可不填。
 	IP        string `json:"ip,omitempty"`
 	UserAgent string `json:"user_agent,omitempty"`
 	RiskToken string `json:"risk_token,omitempty"`
 }
 
-func (r SubmitCreditFlowReq) Valid() error {
-	if r.Card == nil {
-		return errors.New("card risk snapshot is required")
+func (r SubmitReq) Valid() error {
+	if strings.TrimSpace(r.OrderID) == "" {
+		return errors.New("order_id is required")
 	}
-	return ValidStruct(r)
+	hasFlow := r.Card != nil || strings.TrimSpace(r.SessionID) != "" || strings.TrimSpace(r.SessionData) != ""
+	if hasFlow {
+		if r.Card == nil {
+			return errors.New("card risk snapshot is required")
+		}
+		if strings.TrimSpace(r.SessionID) == "" {
+			return errors.New("session_id is required")
+		}
+		if strings.TrimSpace(r.SessionData) == "" {
+			return errors.New("session_data is required")
+		}
+		return nil
+	}
+	if r.ApplePay != nil && strings.TrimSpace(r.ApplePay.AppleToken) != "" {
+		return nil
+	}
+	if r.GooglePay != nil &&
+		strings.TrimSpace(r.GooglePay.Signature) != "" &&
+		strings.TrimSpace(r.GooglePay.SignedMessage) != "" &&
+		strings.TrimSpace(r.GooglePay.ProtocolVersion) != "" {
+		return nil
+	}
+	return errors.New("submit credentials are required")
 }
 
-// SubmitCreditFlowResp 是项目内归一化提交结果，不包含 Checkout 原始 DTO。
-type SubmitCreditFlowResp struct {
+// SubmitResp 是项目内归一化提交结果，不包含 Checkout 原始 DTO。
+type SubmitResp struct {
 	OrderID    string `json:"order_id"`
 	Status     string `json:"status"`
 	PaymentID  string `json:"payment_id,omitempty"`
@@ -204,7 +223,12 @@ type GooglePay struct {
 type CreatePayinResp struct {
 	OrderID        string                  `json:"order_id"`
 	ChannelOrderID string                  `json:"channel_order_id,omitempty"`
-	Link           string                  `json:"link"`
+	Link           string                  `json:"link,omitempty"`
+	Channel        string                  `json:"channel,omitempty"`
+	NextAction     NextAction              `json:"next_action,omitempty"`
+	Status         PayinOrderStatus        `json:"status,omitempty"`
+	OutChannelID   string                  `json:"out_channel_id,omitempty"`
+	Qrcode         string                  `json:"qrcode,omitempty"`
 	PaymentSession *CheckoutPaymentSession `json:"payment_session,omitempty"`
 }
 

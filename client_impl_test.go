@@ -208,9 +208,9 @@ func TestCreatePayinCreditSourceIdRequestUsesSourceIDField(t *testing.T) {
 	}
 }
 
-func TestSubmitCreditFlowSendsCardRiskInfoFields(t *testing.T) {
+func TestSubmitSendsCardRiskInfoFields(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/payin/order/s/2002/checkout/submit" {
+		if r.URL.Path != "/api/payin/order/s/2002/submit" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
 		body, err := io.ReadAll(r.Body)
@@ -242,7 +242,7 @@ func TestSubmitCreditFlowSendsCardRiskInfoFields(t *testing.T) {
 	defer server.Close()
 
 	client := testClient(server.URL)
-	resp, err := client.SubmitCreditFlow(context.Background(), &SubmitCreditFlowReq{
+	resp, err := client.Submit(context.Background(), &SubmitReq{
 		Merchant:    testMerchant,
 		OrderID:     "2002",
 		SessionID:   "ps_2002",
@@ -271,7 +271,7 @@ func TestGetPayinEscapesStringOrderIDInPath(t *testing.T) {
 		if r.URL.EscapedPath() != "/api/payin/order/s/order%2F2001" {
 			t.Fatalf("escaped path = %s", r.URL.EscapedPath())
 		}
-		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"order/2001","merchant_order_id":"M-2001","status":1,"amount":100,"currency":"USD","pay_method":"PayPal"}}`))
+		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"order/2001","merchant_order_id":"M-2001","status":2,"amount":100,"currency":"USD","pay_method":"PayPal"}}`))
 	}))
 	defer server.Close()
 
@@ -290,7 +290,7 @@ func TestGetPayinDecodesMerchantOrderStatus(t *testing.T) {
 		if r.URL.Path != "/api/payin/order/s/2001" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
-		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2001","merchant_order_id":"M-2001","status":1,"amount":100,"has_refund":true,"currency":"USD","pay_method":"PayPal","refund":{"refund_order_id":"8001","status":2,"out_refund_id":"ch-rf-1","amount":100}}}`))
+		_, _ = w.Write([]byte(`{"message":"success","data":{"order_id":"2001","merchant_order_id":"M-2001","status":2,"amount":100,"has_refund":true,"currency":"USD","pay_method":"PayPal","refund":{"refund_order_id":"8001","status":2,"out_refund_id":"ch-rf-1","amount":100}}}`))
 	}))
 	defer server.Close()
 

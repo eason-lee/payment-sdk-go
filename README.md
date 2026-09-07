@@ -5,7 +5,7 @@ Payment 商户网关 Go SDK，用于第三方商户服务端接入代收、代�
 ## 安装
 
 ```bash
-go get github.com/eason-lee/payment-sdk-go@v0.1.12
+go get github.com/eason-lee/payment-sdk-go@v0.1.13
 ```
 
 ## 创建客户端
@@ -79,11 +79,17 @@ if err != nil {
 
 ```go
 fmt.Println(resp.OrderID)
-fmt.Println(resp.ChannelOrderID)
+fmt.Println(resp.Channel)
+fmt.Println(resp.NextAction)
+fmt.Println(resp.Status)
 fmt.Println(resp.Link)
 ```
 
-如果 `resp.Link` 不为空，商户可以把用户跳转到该链接完成支付。
+按 `next_action` 决定下一步：
+
+- `submit`：用 `channel` 与公开客户端参数初始化 SDK，再调 `Submit`
+- `redirect`：打开 `link`
+- `wait`：不跳转、不 Submit，等查询/通知
 
 商户开启风控（`RiskEnabled`）时，`user.ip` 和 `user.user_agent` 必填，且必须是付款人终端地址，不要填机房出口 IP。`risk_token` 是收银台采集的不透明设备指纹（Forter cookie 或 mobile UID），只用于本次校验。
 
@@ -146,7 +152,21 @@ resp, err := client.CreatePayin(ctx, payment.CreatePayinReq{
 })
 ```
 
-CreditFlow 第二阶段提交时，卡片快照字段与网关一致：`card_name`、`bin`、`last4`、`expiry_month`、`expiry_year`、`scheme`、`country`。
+CreditFlow / Native 的第二步走 `Submit`。CreditFlow 卡片快照字段与网关一致：`card_name`、`bin`、`last4`、`expiry_month`、`expiry_year`、`scheme`、`country`。ApplePayNative / GooglePayNative 的 token 在 `Submit` 提交，不要放进 `CreatePayin`。
+
+```go
+resp, err := client.Submit(ctx, &payment.SubmitReq{
+	Merchant:    merchant,
+	OrderID:     created.OrderID,
+	SessionID:   created.PaymentSession.ID,
+	SessionData: sessionData,
+	Card: &payment.CardRiskSnapshot{
+		CardName: "John Doe",
+		Bin:      "424242",
+		Last4:    "4242",
+	},
+})
+```
 
 ## 查询代收订单
 
@@ -157,6 +177,9 @@ payin, err := client.GetPayin(ctx, payment.GetPayinReq{
 })
 if err != nil {
 	return err
+}
+if payin.Status == payment.PayinOrderStatusWaitingSubmit {
+	// 渠道已冻，等待 Submit。
 }
 if payin.Status == payment.PayinOrderStatusProcessing {
 	// 处理中，请等待通知或继续查询。
@@ -174,12 +197,13 @@ if payin.Dispute != nil {
 | 常量 | 值 | 说明 |
 |---|---:|---|
 | `PayinOrderStatusUnspecified` | `0` | 未知状态 |
-| `PayinOrderStatusProcessing` | `1` | 处理中 |
-| `PayinOrderStatusSuccess` | `2` | 支付成功 |
-| `PayinOrderStatusFailed` | `3` | 支付失败 |
-| `PayinOrderStatusRefunding` | `4` | 退款中 |
-| `PayinOrderStatusRefunded` | `5` | 已退款 |
-| `PayinOrderStatusCanceled` | `6` | 已取消 |
+| `PayinOrderStatusWaitingSubmit` | `1` | 待提交 |
+| `PayinOrderStatusProcessing` | `2` | 处理中 |
+| `PayinOrderStatusCanceled` | `3` | 已取消 |
+| `PayinOrderStatusSuccess` | `4` | 支付成功 |
+| `PayinOrderStatusFailed` | `5` | 支付失败 |
+| `PayinOrderStatusRefunding` | `6` | 退款中 |
+| `PayinOrderStatusRefunded` | `7` | 已退款 |
 
 ## 代收退款
 
