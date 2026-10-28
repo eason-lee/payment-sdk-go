@@ -1,18 +1,15 @@
 package payment
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 )
-
-const notifyMaxClockSkew = 5 * time.Minute
 
 type NotifyResp struct {
 	MerchantID     string                    `json:"merchant_id"`               // 商户ID
@@ -33,45 +30,51 @@ type NotifyIdentity struct {
 }
 
 type NotifyReq struct {
-	MerchantID string
-	OrderID    string
-	Tp         MerchantNotifyTp
-	Timestamp  string
-	Nonce      string
-	Signature  string
-	Secret     string
-	Body       []byte
+	MerchantID   string
+	OrderID      string
+	Tp           MerchantNotifyTp
+	Timestamp    string
+	Nonce        string
+	Signature    string
+	SignatureAlg string
+	PublicKey    ed25519.PublicKey
+	Body         []byte
 }
 
-func (n *NotifyReq) Verify() bool {
-	if strings.TrimSpace(n.Secret) == "" || strings.TrimSpace(n.Timestamp) == "" || strings.TrimSpace(n.Nonce) == "" || strings.TrimSpace(n.Signature) == "" {
-		return false
+// Verify checks CallbackV2 (platform Ed25519). Hard cut: shared HMAC is not accepted.
+func (n *NotifyReq) Verify() error {
+	if n == nil {
+		return errors.New("payment: notify request is required")
+	}
+	if len(n.PublicKey) != ed25519.PublicKeySize {
+		return errors.New("payment: callback public key is required")
+	}
+	if strings.TrimSpace(n.Timestamp) == "" || strings.TrimSpace(n.Nonce) == "" || strings.TrimSpace(n.Signature) == "" {
+		return errors.New("payment: notify signature headers are required")
+	}
+	alg := strings.TrimSpace(n.SignatureAlg)
+	if alg == "" {
+		return errors.New("payment: X-Signature-Alg is required")
+	}
+	if !strings.EqualFold(alg, SignatureAlgEd25519) {
+		return fmt.Errorf("payment: unsupported signature alg %q", alg)
 	}
 	timestamp, err := strconv.ParseInt(strings.TrimSpace(n.Timestamp), 10, 64)
 	if err != nil {
-		return false
+		return errors.New("payment: invalid notify timestamp")
 	}
 	now := time.Now()
 	notifyAt := time.Unix(timestamp, 0)
-	if notifyAt.Before(now.Add(-notifyMaxClockSkew)) || notifyAt.After(now.Add(notifyMaxClockSkew)) {
-		return false
+	if notifyAt.After(now.Add(time.Duration(MaxFutureSkew) * time.Second)) {
+		return errors.New("payment: notify timestamp in the future")
 	}
-
-	mac := hmac.New(sha256.New, []byte(n.Secret))
-	mac.Write([]byte(n.Timestamp))
-	mac.Write([]byte("\n"))
-	mac.Write([]byte(n.Nonce))
-	mac.Write([]byte("\n"))
-	mac.Write([]byte(strconv.Itoa(int(n.Tp))))
-	mac.Write([]byte("\n"))
-	mac.Write([]byte(n.OrderID))
-	mac.Write([]byte("\n"))
-	mac.Write(n.Body)
-	got, err := hex.DecodeString(strings.TrimSpace(n.Signature))
-	if err != nil {
-		return false
+	if now.Sub(notifyAt) > time.Duration(TimestampWindow)*time.Second {
+		return errors.New("payment: notify timestamp expired")
 	}
-	return hmac.Equal(got, mac.Sum(nil))
+	if err := VerifyCallbackV2(n.PublicKey, strings.TrimSpace(n.Timestamp), strings.TrimSpace(n.Nonce), int(n.Tp), n.OrderID, n.Body, n.Signature); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (n *NotifyReq) ToNotifyResp() (*NotifyResp, error) {
@@ -164,20 +167,21 @@ func (n *Notify) Identity() (*NotifyIdentity, error) {
 	}, nil
 }
 
-func (n *Notify) ToNotifyReq(secret string) (*NotifyReq, error) {
+func (n *Notify) ToNotifyReq(publicKey ed25519.PublicKey) (*NotifyReq, error) {
 	identity, err := n.Identity()
 	if err != nil {
 		return nil, err
 	}
 	return &NotifyReq{
-		MerchantID: identity.MerchantID,
-		OrderID:    identity.OrderID,
-		Tp:         identity.Tp,
-		Timestamp:  n.Header.Get(headerTimestamp),
-		Nonce:      n.Header.Get(headerNonce),
-		Signature:  n.Header.Get(headerSignature),
-		Secret:     secret,
-		Body:       n.Body,
+		MerchantID:   identity.MerchantID,
+		OrderID:      identity.OrderID,
+		Tp:           identity.Tp,
+		Timestamp:    n.Header.Get(headerTimestamp),
+		Nonce:        n.Header.Get(headerNonce),
+		Signature:    n.Header.Get(headerSignature),
+		SignatureAlg: n.Header.Get(headerSignatureAlg),
+		PublicKey:    publicKey,
+		Body:         n.Body,
 	}, nil
 }
 

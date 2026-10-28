@@ -2,9 +2,9 @@ package payment
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -17,13 +17,29 @@ import (
 
 var testMerchant = Merchant{ID: "1001", Secret: "merchant-secret"}
 
+var (
+	testCallbackPrivate ed25519.PrivateKey
+	testCallbackPublic  ed25519.PublicKey
+	testCallbackPubB64  string
+)
+
+func init() {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	testCallbackPublic = pub
+	testCallbackPrivate = priv
+	testCallbackPubB64 = base64.StdEncoding.EncodeToString(pub)
+}
+
 func TestCreatePayinSignsRequestLikePaymentGateway(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), body)
+		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.URL.RawQuery, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), testMerchant.ID, body)
 		if got := r.Header.Get(headerSignature); got != want {
 			t.Fatalf("signature mismatch\nwant: %s\n got: %s", want, got)
 		}
@@ -95,7 +111,7 @@ func TestCreatePayinCreditFlowRequestAndResponse(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), body)
+		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.URL.RawQuery, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), testMerchant.ID, body)
 		if got := r.Header.Get(headerSignature); got != want {
 			t.Fatalf("signature mismatch\nwant: %s\n got: %s", want, got)
 		}
@@ -361,7 +377,7 @@ func TestParseNotifyVerifiesAndDecodesPayinPayload(t *testing.T) {
 		t.Fatalf("identity = %+v", identity)
 	}
 
-	resp, err := client.ParseNotify(context.Background(), testMerchant.Secret, notify)
+	resp, err := client.ParseNotify(context.Background(), testCallbackPubB64, notify)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +394,7 @@ func TestParseNotifyRejectsBadSignature(t *testing.T) {
 	header := signedNotifyHeader(testMerchant, MerchantNotifyTpPayIn, body)
 	header.Set(headerSignature, "bad")
 
-	_, err := NewClient(EnvProduction).ParseNotify(context.Background(), testMerchant.Secret, &Notify{
+	_, err := NewClient(EnvProduction).ParseNotify(context.Background(), testCallbackPubB64, &Notify{
 		Header: header,
 		Body:   body,
 	})
@@ -391,9 +407,9 @@ func TestParseNotifyRejectsExpiredTimestamp(t *testing.T) {
 	body := []byte(`{"orderId":"2001","merchantOrderId":"M-2001","status":1,"fee":100}`)
 	header := signedNotifyHeader(testMerchant, MerchantNotifyTpPayIn, body)
 	header.Set(headerTimestamp, strconv.FormatInt(time.Now().Add(-10*time.Minute).Unix(), 10))
-	header.Set(headerSignature, notifySignature(testMerchant.Secret, header.Get(headerTimestamp), header.Get(headerNonce), header.Get(headerNotifyTp), header.Get(headerOrderID), body))
+	resignNotifyHeader(header, body)
 
-	_, err := NewClient(EnvProduction).ParseNotify(context.Background(), testMerchant.Secret, &Notify{
+	_, err := NewClient(EnvProduction).ParseNotify(context.Background(), testCallbackPubB64, &Notify{
 		Header: header,
 		Body:   body,
 	})
@@ -406,9 +422,9 @@ func TestParseNotifyRejectsMismatchedHeaderOrderID(t *testing.T) {
 	body := []byte(`{"orderId":"2001","merchantOrderId":"M-2001","status":1,"fee":100}`)
 	header := signedNotifyHeader(testMerchant, MerchantNotifyTpPayIn, body)
 	header.Set(headerOrderID, "2002")
-	header.Set(headerSignature, notifySignature(testMerchant.Secret, header.Get(headerTimestamp), header.Get(headerNonce), header.Get(headerNotifyTp), header.Get(headerOrderID), body))
+	resignNotifyHeader(header, body)
 
-	_, err := NewClient(EnvProduction).ParseNotify(context.Background(), testMerchant.Secret, &Notify{
+	_, err := NewClient(EnvProduction).ParseNotify(context.Background(), testCallbackPubB64, &Notify{
 		Header: header,
 		Body:   body,
 	})
@@ -419,7 +435,7 @@ func TestParseNotifyRejectsMismatchedHeaderOrderID(t *testing.T) {
 
 func TestParseNotifyRefundFailedStatus(t *testing.T) {
 	body := []byte(`{"orderId":"2001","merchantOrderId":"M-2001","refundOrderId":"3001","status":3,"failReason":"declined"}`)
-	resp, err := NewClient(EnvProduction).ParseNotify(context.Background(), testMerchant.Secret, &Notify{
+	resp, err := NewClient(EnvProduction).ParseNotify(context.Background(), testCallbackPubB64, &Notify{
 		Header: signedNotifyHeader(testMerchant, MerchantNotifyTpPayInRefund, body),
 		Body:   body,
 	})
@@ -436,7 +452,7 @@ func TestParseNotifyRefundFailedStatus(t *testing.T) {
 
 func TestParseNotifyDisputeCanceledStatus(t *testing.T) {
 	body := []byte(`{"orderId":"2001","merchantOrderId":"M-2001","disputeOrderId":"4001","amount":100,"status":4}`)
-	resp, err := NewClient(EnvProduction).ParseNotify(context.Background(), testMerchant.Secret, &Notify{
+	resp, err := NewClient(EnvProduction).ParseNotify(context.Background(), testCallbackPubB64, &Notify{
 		Header: signedNotifyHeader(testMerchant, MerchantNotifyTpPayInDispute, body),
 		Body:   body,
 	})
@@ -450,7 +466,7 @@ func TestParseNotifyDisputeCanceledStatus(t *testing.T) {
 
 func TestParseNotifyCardBind(t *testing.T) {
 	body := []byte(`{"orderId":"2001","merchantOrderId":"M-2001","userId":"u1","sourceId":"src_1","last4":"4242","bin":"424242"}`)
-	resp, err := NewClient(EnvProduction).ParseNotify(context.Background(), testMerchant.Secret, &Notify{
+	resp, err := NewClient(EnvProduction).ParseNotify(context.Background(), testCallbackPubB64, &Notify{
 		Header: signedNotifyHeader(testMerchant, MerchantNotifyTpPayInCardBind, body),
 		Body:   body,
 	})
@@ -467,7 +483,7 @@ func TestParseNotifyCardBind(t *testing.T) {
 
 func TestParseNotifyFraud(t *testing.T) {
 	body := []byte(`{"orderId":"2001","merchantOrderId":"M-2001","userId":"u1","reason":"stolen","type":"fraud","eci":"05"}`)
-	resp, err := NewClient(EnvProduction).ParseNotify(context.Background(), testMerchant.Secret, &Notify{
+	resp, err := NewClient(EnvProduction).ParseNotify(context.Background(), testCallbackPubB64, &Notify{
 		Header: signedNotifyHeader(testMerchant, MerchantNotifyTpPayInFraud, body),
 		Body:   body,
 	})
@@ -484,7 +500,7 @@ func TestParseNotifyFraud(t *testing.T) {
 
 func TestParseNotifyRejectsUnknownType(t *testing.T) {
 	body := []byte(`{"orderId":"2001"}`)
-	_, err := NewClient(EnvProduction).ParseNotify(context.Background(), testMerchant.Secret, &Notify{
+	_, err := NewClient(EnvProduction).ParseNotify(context.Background(), testCallbackPubB64, &Notify{
 		Header: signedNotifyHeader(testMerchant, MerchantNotifyTp(99), body),
 		Body:   body,
 	})
@@ -502,7 +518,7 @@ func TestAppealDisputeSignsAndOmitsSecret(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), body)
+		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.URL.RawQuery, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), testMerchant.ID, body)
 		if got := r.Header.Get(headerSignature); got != want {
 			t.Fatalf("signature mismatch\nwant: %s\n got: %s", want, got)
 		}
@@ -554,7 +570,7 @@ func TestBindPayPalAgreementSignsAndOmitsSecret(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), body)
+		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.URL.RawQuery, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), testMerchant.ID, body)
 		if got := r.Header.Get(headerSignature); got != want {
 			t.Fatalf("signature mismatch\nwant: %s\n got: %s", want, got)
 		}
@@ -601,7 +617,7 @@ func TestCancelPayPalAgreementMapsUserIDToPlayerID(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), body)
+		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.URL.RawQuery, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), testMerchant.ID, body)
 		if got := r.Header.Get(headerSignature); got != want {
 			t.Fatalf("signature mismatch\nwant: %s\n got: %s", want, got)
 		}
@@ -645,7 +661,7 @@ func TestApprovePayPalAgreementSendsToken(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), body)
+		want := signGatewayRequest(testMerchant.Secret, r.Method, r.URL.Path, r.URL.RawQuery, r.Header.Get(headerTimestamp), r.Header.Get(headerNonce), testMerchant.ID, body)
 		if got := r.Header.Get(headerSignature); got != want {
 			t.Fatalf("signature mismatch\nwant: %s\n got: %s", want, got)
 		}
@@ -689,41 +705,33 @@ func testClient(baseURL string) *ClientImpl {
 	}
 }
 
-func signGatewayRequest(secret, method, path, timestamp, nonce string, body []byte) string {
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(method))
-	mac.Write([]byte("\n"))
-	mac.Write([]byte(path))
-	mac.Write([]byte("\n"))
-	mac.Write([]byte(timestamp))
-	mac.Write([]byte("\n"))
-	mac.Write([]byte(nonce))
-	mac.Write([]byte("\n"))
-	mac.Write(body)
-	return hex.EncodeToString(mac.Sum(nil))
+func signGatewayRequest(secret, method, path, rawQuery, timestamp, nonce, merchantID string, body []byte) string {
+	return SignHMACV2(secret, method, path, rawQuery, timestamp, nonce, merchantID, body)
 }
 
 func signedNotifyHeader(merchant Merchant, tp MerchantNotifyTp, body []byte) http.Header {
+	_ = merchant
 	header := http.Header{}
 	header.Set(headerMerchantID, merchant.ID)
 	header.Set(headerTimestamp, strconv.FormatInt(time.Now().Unix(), 10))
 	header.Set(headerNonce, "nonce-abc")
 	header.Set(headerNotifyTp, strconv.Itoa(int(tp)))
 	header.Set(headerOrderID, "2001")
-	header.Set(headerSignature, notifySignature(merchant.Secret, header.Get(headerTimestamp), header.Get(headerNonce), header.Get(headerNotifyTp), header.Get(headerOrderID), body))
+	header.Set(headerSignatureAlg, SignatureAlgEd25519)
+	sig, err := SignCallbackV2ForTest(testCallbackPrivate, header.Get(headerTimestamp), header.Get(headerNonce), int(tp), "2001", body)
+	if err != nil {
+		panic(err)
+	}
+	header.Set(headerSignature, sig)
 	return header
 }
 
-func notifySignature(secret, timestamp, nonce, notifyTp, orderID string, body []byte) string {
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(timestamp))
-	mac.Write([]byte("\n"))
-	mac.Write([]byte(nonce))
-	mac.Write([]byte("\n"))
-	mac.Write([]byte(notifyTp))
-	mac.Write([]byte("\n"))
-	mac.Write([]byte(orderID))
-	mac.Write([]byte("\n"))
-	mac.Write(body)
-	return hex.EncodeToString(mac.Sum(nil))
+func resignNotifyHeader(header http.Header, body []byte) {
+	tp, _ := strconv.Atoi(header.Get(headerNotifyTp))
+	sig, err := SignCallbackV2ForTest(testCallbackPrivate, header.Get(headerTimestamp), header.Get(headerNonce), tp, header.Get(headerOrderID), body)
+	if err != nil {
+		panic(err)
+	}
+	header.Set(headerSignatureAlg, SignatureAlgEd25519)
+	header.Set(headerSignature, sig)
 }

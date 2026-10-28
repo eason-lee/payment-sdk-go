@@ -3,10 +3,7 @@ package payment
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -222,13 +219,8 @@ func (c *ClientImpl) doJSON(ctx context.Context, merchant Merchant, method strin
 	if err != nil {
 		return fmt.Errorf("payment: generate nonce: %w", err)
 	}
-	signature := c.signRequest(merchant.Secret, signRequestInput{
-		Method:    method,
-		Path:      path,
-		Timestamp: timestamp,
-		Nonce:     nonce,
-		Body:      rawBody,
-	})
+	signPath := requestSignPath(req.URL)
+	signature := SignHMACV2(merchant.Secret, method, signPath, req.URL.RawQuery, timestamp, nonce, merchantID, rawBody)
 
 	req.Header.Set(headerMerchantID, merchantID)
 	req.Header.Set(headerTimestamp, timestamp)
@@ -294,31 +286,6 @@ func (c *ClientImpl) generateNonce() (string, error) {
 	return string(raw), nil
 }
 
-type signRequestInput struct {
-	Method    string
-	Path      string
-	Timestamp string
-	Nonce     string
-	Body      []byte
-}
-
-func (c *ClientImpl) signRequest(secret string, in signRequestInput) string {
-	var payload strings.Builder
-	payload.WriteString(in.Method)
-	payload.WriteString("\n")
-	payload.WriteString(in.Path)
-	payload.WriteString("\n")
-	payload.WriteString(in.Timestamp)
-	payload.WriteString("\n")
-	payload.WriteString(in.Nonce)
-	payload.WriteString("\n")
-	payload.Write(in.Body)
-
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(payload.String()))
-	return hex.EncodeToString(mac.Sum(nil))
-}
-
 func (c *ClientImpl) GetNotifyIdentity(notify *Notify) (*NotifyIdentity, error) {
 	if notify == nil {
 		return nil, errors.New("payment: notify is required")
@@ -326,16 +293,23 @@ func (c *ClientImpl) GetNotifyIdentity(notify *Notify) (*NotifyIdentity, error) 
 	return notify.Identity()
 }
 
-func (c *ClientImpl) ParseNotify(ctx context.Context, secret string, notify *Notify) (*NotifyResp, error) {
+// ParseNotify verifies CallbackV2 (platform Ed25519) and decodes the notify payload.
+// publicKeyMaterial is hex, std/raw base64, or PKIX/SPKI PEM of the platform public key.
+func (c *ClientImpl) ParseNotify(ctx context.Context, publicKeyMaterial string, notify *Notify) (*NotifyResp, error) {
+	_ = ctx
 	if notify == nil {
 		return nil, errors.New("payment: notify is required")
 	}
-	req, err := notify.ToNotifyReq(secret)
+	pub, err := ParseCallbackPublicKey(publicKeyMaterial)
 	if err != nil {
 		return nil, err
 	}
-	if ok := req.Verify(); !ok {
-		return nil, errors.New("payment: verify notify request failed")
+	req, err := notify.ToNotifyReq(pub)
+	if err != nil {
+		return nil, err
+	}
+	if err := req.Verify(); err != nil {
+		return nil, err
 	}
 	resp, err := req.ToNotifyResp()
 	if err != nil {

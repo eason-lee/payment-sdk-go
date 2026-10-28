@@ -27,7 +27,9 @@ type Client interface {
 
 type NotifyClient interface {
 	GetNotifyIdentity(notify *Notify) (*NotifyIdentity, error)
-	ParseNotify(ctx context.Context, secret string, notify *Notify) (*NotifyResp, error)
+	// ParseNotify verifies a platform CallbackV2 (Ed25519) notify and decodes the payload.
+	// publicKeyMaterial is the platform public key: hex, std/raw base64, or PKIX/SPKI PEM.
+	ParseNotify(ctx context.Context, publicKeyMaterial string, notify *Notify) (*NotifyResp, error)
 	NotifySuccess(w http.ResponseWriter)
 	NotifyFailed(w http.ResponseWriter)
 }
