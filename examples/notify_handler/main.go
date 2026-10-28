@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -31,12 +30,14 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
 	}
-	secret, err := loadMerchantSecret(r.Context(), identity.MerchantID, identity.OrderID)
+	// CallbackV2: verify with platform Ed25519 public key (not merchant HMAC secret).
+	publicKey, err := loadPlatformCallbackPublicKey(r.Context())
 	if err != nil {
-		http.Error(w, "invalid merchant", http.StatusBadRequest)
+		http.Error(w, "missing platform public key", http.StatusInternalServerError)
 		return
 	}
-	event, err := client.ParseNotify(r.Context(), secret, notify)
+	_ = identity // use for routing / idempotency keys as needed
+	event, err := client.ParseNotify(r.Context(), publicKey, notify)
 	if err != nil {
 		http.Error(w, "invalid payload", http.StatusBadRequest)
 		return
@@ -62,11 +63,8 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 	client.NotifySuccess(w)
 }
 
-func loadMerchantSecret(ctx context.Context, merchantID string, orderID string) (string, error) {
+func loadPlatformCallbackPublicKey(ctx context.Context) (string, error) {
 	_ = ctx
-	_ = orderID
-	if merchantID != "1001" {
-		return "", errors.New("merchant not found")
-	}
-	return "test-secret", nil
+	// Prefer env PAYMENT_CALLBACK_ED25519_PUBLIC_KEY (hex or base64).
+	return "REPLACE_WITH_PLATFORM_ED25519_PUBLIC_KEY", nil
 }

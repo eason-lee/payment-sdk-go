@@ -3,12 +3,24 @@ package payment
 import "errors"
 
 const (
-	headerMerchantID = "X-Merchant-Id"
-	headerTimestamp  = "X-Timestamp"
-	headerNonce      = "X-Nonce"
-	headerSignature  = "X-Signature"
-	headerNotifyTp   = "X-Notify-Tp"
-	headerOrderID    = "X-Order-Id"
+	headerMerchantID   = "X-Merchant-Id"
+	headerTimestamp    = "X-Timestamp"
+	headerNonce        = "X-Nonce"
+	headerSignature    = "X-Signature"
+	headerSignatureAlg = "X-Signature-Alg"
+	headerNotifyTp     = "X-Notify-Tp"
+	headerOrderID      = "X-Order-Id"
+
+	// SignatureAlgEd25519 is the fixed CallbackV2 algorithm header value.
+	SignatureAlgEd25519 = "Ed25519"
+
+	signPrefixHMACV2     = "PAYPAYA-HMAC-SHA256"
+	callbackSignPrefixV2 = "PAYPAYA-CALLBACK-ED25519"
+
+	// TimestampWindow is how far in the past a signed timestamp may be (inbound + CallbackV2).
+	TimestampWindow = 5 * 60 // seconds; 300s, matches paypaya merchant.TimestampWindow
+	// MaxFutureSkew is how far in the future a signed timestamp may be.
+	MaxFutureSkew = 30 // seconds; matches paypaya merchant.MaxFutureSkew
 )
 
 // PayMethod 支付方法

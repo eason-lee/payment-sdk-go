@@ -41,6 +41,28 @@ merchant := payment.Merchant{
 
 `Merchant.Secret` 只能保存在商户服务端，不能暴露到浏览器、移动端或前端包里。
 
+## 鉴权 v2（硬切）
+
+与 paypaya / Multica BLH-95 对齐：
+
+- **出站请求**：HMAC-SHA256 v2。规范串为
+
+```text
+PAYPAYA-HMAC-SHA256
+METHOD
+PATH
+canonical-query
+TS
+NONCE
+MERCHANT_ID
+hex(sha256(body))
+```
+
+请求头仍为 `X-Merchant-Id` / `X-Timestamp` / `X-Nonce` / `X-Signature`（小写 hex）。不要求 `X-Key-Id`。
+
+- **回调验签（CallbackV2）**：平台 Ed25519。`ParseNotify` 第二个参数是**平台公钥**（hex / base64 / PKIX PEM），不再传商户 secret。回调头含 `X-Signature-Alg: Ed25519`，`X-Signature` 为 **base64**。旧共享 HMAC 回调验签已删除。
+
+
 ## 创建代收订单
 
 ```go
@@ -327,7 +349,7 @@ if payout.Status == payment.PayoutOrderStatusProcessing {
 
 ## 接收商户通知
 
-通知验签必须使用 HTTP 请求的原始 body，不能先反序列化再重新序列化。
+通知验签必须使用 HTTP 请求的原始 body，不能先反序列化再重新序列化。CallbackV2 时钟窗与入站一致：过去 300s，未来最多 +30s。
 
 ```go
 func notifyHandler(w http.ResponseWriter, r *http.Request) {
@@ -350,13 +372,9 @@ func notifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	secret, err := loadMerchantSecret(r.Context(), identity.MerchantID, identity.OrderID)
-	if err != nil {
-		client.NotifyFailed(w)
-		return
-	}
-
-	event, err := client.ParseNotify(r.Context(), secret, notify)
+	// CallbackV2：用平台 Ed25519 公钥验签（不是商户 HMAC secret）。
+	publicKey := os.Getenv("PAYMENT_CALLBACK_ED25519_PUBLIC_KEY")
+	event, err := client.ParseNotify(r.Context(), publicKey, notify)
 	if err != nil {
 		client.NotifyFailed(w)
 		return
